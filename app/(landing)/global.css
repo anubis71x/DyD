@@ -1,0 +1,357 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "BeaufortForLOL";
+  src: url("/fonts/BeaufortForLOL-Bold.woff2") format("woff2");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Spiegel";
+  src: url("/fonts/Spiegel-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --lol-gold: #c89b3c;
+  --lol-gold-light: #f0e6d2;
+  --lol-blue: #0ac8b9;
+  --lol-dark: #010a13;
+  --lol-gray: #a09b8c;
+  --lol-dark-gray: #1e2328;
+}
+
+body {
+  font-family: "Spiegel", sans-serif;
+  background-color: var(--lol-dark);
+  color: var(--lol-gold-light);
+  overflow: hidden;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+button,
+.font-bold {
+  font-family: "BeaufortForLOL", serif;
+}
+
+/* Swiper custom styles */
+.swiper-pagination {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  right: 20px !important;
+  left: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: auto !important;
+}
+
+.swiper-pagination-bullet {
+  width: 10px !important;
+  height: 10px !important;
+  background-color: var(--lol-gold) !important;
+  opacity: 0.5 !important;
+  transition: all 0.3s ease;
+}
+
+.swiper-pagination-bullet-active {
+  opacity: 1 !important;
+  height: 20px !important;
+  background-color: var(--lol-gold) !important;
+}
+
+/* Glowing effects */
+.glow-text {
+  text-shadow: 0 0 10px var(--lol-gold), 0 0 20px var(--lol-gold);
+}
+
+.glow-border {
+  box-shadow: 0 0 10px var(--lol-gold), 0 0 20px var(--lol-gold);
+}
+
+/* Animation classes */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Particle animation */
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  transition: transform 0.1s linear;
+}
+
+/* Radial gradient for vignette effect */
+.bg-radial-gradient {
+  background: radial-gradient(circle at center, transparent 0%, #010a13 80%);
+}
+
+/* Subtle text glow */
+.glow-text-subtle {
+  text-shadow: 0 0 5px rgba(200, 155, 60, 0.3), 0 0 10px rgba(200, 155, 60, 0.2);
+}
+
+/* Champion card hover effects */
+@keyframes borderGlow {
+  0% {
+    box-shadow: 0 0 5px rgba(10, 200, 185, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(10, 200, 185, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(10, 200, 185, 0.3);
+  }
+}
+
+.champion-card-glow {
+  animation: borderGlow 2s infinite;
+}
+
+/* Hexagon clip path for UI elements */
+.clip-hexagon {
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+/* Animated background for sections */
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animated-bg {
+  background: linear-gradient(45deg, #010a13, #1e2328, #0a1428);
+  background-size: 200% 200%;
+  animation: gradientBG 15s ease infinite;
+}
+
+/* Rune-like decorative elements */
+.rune-decoration::before,
+.rune-decoration::after {
+  content: "";
+  position: absolute;
+  background-color: var(--lol-gold);
+  opacity: 0.3;
+}
+
+.rune-decoration::before {
+  width: 2px;
+  height: 40px;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.rune-decoration::after {
+  width: 40px;
+  height: 2px;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Animated loading bar */
+@keyframes loadingBar {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.loading-bar {
+  position: relative;
+  height: 2px;
+  background-color: rgba(200, 155, 60, 0.3);
+  overflow: hidden;
+}
+
+.loading-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background-color: var(--lol-gold);
+  animation: loadingBar 2.5s ease-in-out infinite;
+}
+
+/* Skill level indicators */
+.skill-level {
+  display: flex;
+  gap: 2px;
+}
+
+.skill-level-indicator {
+  width: 6px;
+  height: 6px;
+  background-color: var(--lol-dark-gray);
+  border-radius: 50%;
+}
+
+.skill-level-indicator.active {
+  background-color: var(--lol-blue);
+}
+
+/* Champion role icons */
+.role-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Animated button effects */
+.btn-hover-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-hover-effect::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.7s ease;
+}
+
+.btn-hover-effect:hover::after {
+  left: 100%;
+}
+
+/* Decorative corner elements */
+.corner-decoration {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+}
+
+.corner-decoration::before,
+.corner-decoration::after {
+  content: "";
+  position: absolute;
+  background-color: var(--lol-gold);
+  opacity: 0.5;
+}
+
+.corner-decoration::before {
+  width: 100%;
+  height: 2px;
+}
+
+.corner-decoration::after {
+  width: 2px;
+  height: 100%;
+}
+
+.corner-decoration.top-left::before {
+  top: 0;
+  right: 0;
+}
+.corner-decoration.top-left::after {
+  top: 0;
+  left: 0;
+}
+
+.corner-decoration.top-right::before {
+  top: 0;
+  left: 0;
+}
+.corner-decoration.top-right::after {
+  top: 0;
+  right: 0;
+}
+
+.corner-decoration.bottom-left::before {
+  bottom: 0;
+  right: 0;
+}
+.corner-decoration.bottom-left::after {
+  bottom: 0;
+  left: 0;
+}
+
+.corner-decoration.bottom-right::before {
+  bottom: 0;
+  left: 0;
+}
+.corner-decoration.bottom-right::after {
+  bottom: 0;
+  right: 0;
+}
+
+/* Animated champion splash art */
+@keyframes splashReveal {
+  0% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.splash-reveal {
+  animation: splashReveal 1.2s ease-out forwards;
+}
+
+/* Hexagon clip mask for champion portraits */
+.clip-hexagon-portrait {
+  clip-path: polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%);
+}
+
