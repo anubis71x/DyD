@@ -106,17 +106,17 @@ export default function DndAiLanding() {
   const sections = [
     {
       id: "hero",
-      title: "MASTER THE ART OF STORYTELLING",
+      title: "dreampool.ai",
       subtitle: "",
       description:
-        "Elevate your Dreampool campaigns with our AI Dungeon Master Assistant. Create immersive worlds, compelling NPCs, and epic adventures with the power of artificial intelligence.",
+        "Finally, an AI game master who dynamically runs your adventure in any setting or ruleset, solo or with friends. On a PC or on a long drive, have an adventure anywhere you can talk and listen..",
       image: "https://i.ibb.co/JWY1Y8Zz/Sora-ezgif-com-video-to-gif-converter.gif",
       position: "center",
       badge: "NEW RELEASE",
       stats: [
-        { label: "ADVENTURES", value: "1000+", icon: <Scroll className="w-5 h-5" /> },
-        { label: "DMs", value: "50K+", icon: <Users className="w-5 h-5" /> },
-        { label: "WORLDS", value: "100+", icon: <Wand2 className="w-5 h-5" /> },
+        { label: "ADVENTURES", value: "Unlimited", icon: <Swords className="w-5 h-5" /> },
+        { label: "WORLDS", value: "Infinite", icon: <Scroll className="w-5 h-5" /> },
+        { label: "LANGUAGES", value: "32", icon: <Users className="w-5 h-5" /> },
       ],
     },
     {
@@ -186,7 +186,7 @@ export default function DndAiLanding() {
 
               {/* biome-ignore lint/a11y/useButtonType: <explanation> */}
               <button className="bg-[#8E44AD] hover:bg-[#9B59B6] text-white font-bold xl:px-6 xl:py-2 px-3 py-2 rounded relative group overflow-hidden" onClick={()=> router.push('/dashboard')}>
-                <span className="relative z-10">START CREATING</span>
+                <span className="relative z-10">START ADVENTURING</span>
                 <div className="absolute inset-0 bg-[#F1C40F] transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
               {/* inicio */}
               </button>
@@ -453,4 +453,3 @@ export default function DndAiLanding() {
     </div>
   )
 }
-
