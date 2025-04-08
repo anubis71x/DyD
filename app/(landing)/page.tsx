@@ -16,23 +16,23 @@ import { useRouter } from "next/navigation"
 // AI Features data
 const aiFeatures = [
   {
-    name: "Create epic quests in seconds",
+    name: "CREATE EPIC QUESTS",
     description: "",
     image: "https://i.ibb.co/MxBtBCrp/DALL-E-2025-03-26-23-59-04-A-fantasy-themed-illustration-of-an-Adventure-Generator-concept-The-image.webp",
   },
   {
-    name: "NPC CREATOR",
-    description: "Bring unique characters to life",
+    name: "GENERATE LIFELIKE NPCs",
+    description: "",
     image: "https://i.ibb.co/3y3t4Hf3/npc.webp",
   },
   {
-    name: "WORLD BUILDER",
-    description: "Craft immersive realms and cities",
+    name: "BUILD IMMERSIVE WORLDS",
+    description: "",
     image: "https://i.ibb.co/QvbRsxTK/world.webp",
   },
   {
-    name: "COMBAT ASSISTANT",
-    description: "Manage epic battles with ease",
+    name: "MANAGE COMBAT WITH EASE",
+    description: "",
     image: "https://i.ibb.co/MD54Bfpz/8ca46b50-151e-42d2-8214-43287a07d1ee.png",
   
   },
@@ -124,17 +124,17 @@ export default function DndAiLanding() {
       title: "FORGE YOUR LEGEND",
       subtitle: "",
       description:
-        "From generating intricate plot hooks to designing complex NPCs, our AI assistant provides you with the tools to create unforgettable dreampool experiences.",
+        "From crafting intricate plot hooks to delivering emotive dialogue, our AI voice assistant brings unforgettable stories to life under your direction.",
       image: "https://i.ibb.co/JWY1Y8Zz/Sora-ezgif-com-video-to-gif-converter.gif",
       position: "right",
       showFeatures: true,
     },
     {
       id: "worldbuilding",
-      title: "CRAFT EPIC REALMS",
+      title: "EXPLORE EPIC REALMS",
       subtitle: "",
       description:
-        "Design sprawling cities, mysterious dungeons, and entire planes of existence. Our AI helps you flesh out every detail, from local customs to ancient artifacts.",
+        "Navigate sprawling cities, mysterious dungeons, and entire planes of existence. Our AI fleshes out every detail, from local customs to ancient artifacts.",
       image: "https://i.ibb.co/JWY1Y8Zz/Sora-ezgif-com-video-to-gif-converter.gif",
       position: "left",
       badge: "WORLD BUILDER",
