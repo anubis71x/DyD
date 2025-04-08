@@ -139,9 +139,9 @@ export default function DndAiLanding() {
       position: "left",
       badge: "WORLD BUILDER",
       stats: [
-        { label: "LOCATIONS", value: "10K+", icon: <Wand2 className="w-5 h-5" /> },
-        { label: "FACTIONS", value: "500+", icon: <Users className="w-5 h-5" /> },
-        { label: "ARTIFACTS", value: "1000+", icon: <Swords className="w-5 h-5" /> },
+        { label: "SETTINGS", value: "Dozens of", icon: <Wand2 className="w-5 h-5" /> },
+        { label: "FACTIONS", value: "Unlmited", icon: <Users className="w-5 h-5" /> },
+        { label: "COMBAT SYSTEM", value: "Customized", icon: <Swords className="w-5 h-5" /> },
       ],
     },
     // {
