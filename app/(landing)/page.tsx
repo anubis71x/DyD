@@ -114,9 +114,9 @@ export default function DndAiLanding() {
       position: "left",
       badge: "NEW RELEASE",
       stats: [
-        { label: "ADVENTURES", value: "Unlimited", icon: <Swords className="w-5 h-5" /> },
-        { label: "WORLDS", value: "Infinite", icon: <Scroll className="w-5 h-5" /> },
-        { label: "LANGUAGES", value: "32", icon: <Users className="w-5 h-5" /> },
+        { label: "ADVENTURES", value: "Epic", icon: <Swords className="w-5 h-5" /> },
+        { label: "WORLDS", value: "Sprawling", icon: <Scroll className="w-5 h-5" /> },
+        { label: "LANGUAGES", value: "32 available", icon: <Users className="w-5 h-5" /> },
       ],
     },
     {
@@ -139,8 +139,8 @@ export default function DndAiLanding() {
       position: "left",
       badge: "WORLD BUILDER",
       stats: [
-        { label: "SETTINGS", value: "Dozens of", icon: <Wand2 className="w-5 h-5" /> },
-        { label: "FACTIONS", value: "Unlmited", icon: <Users className="w-5 h-5" /> },
+        { label: "POSSIBLE SETTINGS", value: "Dozens of", icon: <Wand2 className="w-5 h-5" /> },
+        { label: "CHARACTERS", value: "Unlmited", icon: <Users className="w-5 h-5" /> },
         { label: "COMBAT SYSTEM", value: "Customized", icon: <Swords className="w-5 h-5" /> },
       ],
     },
