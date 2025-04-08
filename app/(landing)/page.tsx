@@ -109,7 +109,7 @@ export default function DndAiLanding() {
       title: "dreampool.ai",
       subtitle: "",
       description:
-        "Finally, an AI game master who dynamically runs your adventure in any setting or ruleset, solo or with friends. On a PC or on a long drive, have an adventure anywhere you can talk and listen..",
+        "An AI game master that dynamically runs your adventure in any setting or ruleset. Play solo or with friends—whether on PC or even on the go. Have your adventure anywhere—just talk, listen, and let the AI bring your world to life.",
       image: "https://i.ibb.co/JWY1Y8Zz/Sora-ezgif-com-video-to-gif-converter.gif",
       position: "center",
       badge: "NEW RELEASE",
@@ -124,7 +124,7 @@ export default function DndAiLanding() {
       title: "FORGE YOUR LEGEND",
       subtitle: "",
       description:
-        "From generating intricate plot hooks to designing complex NPCs, our AI assistant provides you with the tools to create unforgettable Dreampool experiences.",
+        "From generating intricate plot hooks to designing complex NPCs, our AI assistant provides you with the tools to create unforgettable dreampool experiences.",
       image: "https://i.ibb.co/JWY1Y8Zz/Sora-ezgif-com-video-to-gif-converter.gif",
       position: "right",
       showFeatures: true,
@@ -149,7 +149,7 @@ export default function DndAiLanding() {
     //   title: "JOIN THE GUILD",
     //   subtitle: "",
     //   description:
-    //     "Share your creations, get inspired by others, and collaborate on epic campaigns. Our community of DMs and players is here to support and elevate your Dreampool experience.",
+    //     "Share your creations, get inspired by others, and collaborate on epic campaigns. Our community of DMs and players is here to support and elevate your dreampool experience.",
     //   image: "https://images.ctfassets.net/swt2dsco9mfe/22Xj1YPLa19KYGAOGcAhbb/014bde378bc8e710eb15fb7fc99e5d0c/1920x1080-terrain-wa.jpg",
     //   position: "center",
     //   badge: "COMMUNITY",
@@ -177,7 +177,7 @@ export default function DndAiLanding() {
                   <div className="absolute inset-2 bg-[#F1C40F] rounded-full" />
                 </div>
                 <span className="relative">
-                  Dreampool 
+                  dreampool 
                   <div className="absolute -bottom-1 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-[#F1C40F] to-transparent" />
                 </span>
               </div>
