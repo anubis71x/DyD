@@ -111,7 +111,7 @@ export default function DndAiLanding() {
       description:
         "An AI game master that dynamically runs your adventure in any setting or ruleset. Play solo or with friends—whether on PC or even on the go. Have your adventure anywhere—just talk, listen, and let the AI bring your world to life.",
       image: "https://i.ibb.co/JWY1Y8Zz/Sora-ezgif-com-video-to-gif-converter.gif",
-      position: "center",
+      position: "left",
       badge: "NEW RELEASE",
       stats: [
         { label: "ADVENTURES", value: "Unlimited", icon: <Swords className="w-5 h-5" /> },
