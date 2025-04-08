@@ -16,8 +16,8 @@ import { useRouter } from "next/navigation"
 // AI Features data
 const aiFeatures = [
   {
-    name: "ADVENTURE GENERATOR",
-    description: "Create epic quests in seconds",
+    name: "Create epic quests in seconds",
+    description: "",
     image: "https://i.ibb.co/MxBtBCrp/DALL-E-2025-03-26-23-59-04-A-fantasy-themed-illustration-of-an-Adventure-Generator-concept-The-image.webp",
   },
   {
