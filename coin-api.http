@@ -1,0 +1,30 @@
+### Obtener todas las transacciones de coins
+GET http://localhost:3000/api/token
+
+### Crear una nueva transacción de coins
+POST http://localhost:3000/api/token
+Content-Type: application/json
+
+{
+  "userId": "usuario123",
+  "coins": 100,
+  "usdValue": 10.5
+}
+
+### Actualizar una transacción de coins por userId
+PUT http://localhost:3000/api/token
+Content-Type: application/json
+
+{
+  "userId": "usuario123",
+  "coins": 150,
+  "usdValue": 15.0
+}
+
+### Eliminar una transacción de coins por userId
+DELETE http://localhost:3000/api/token
+Content-Type: application/json
+
+{
+  "userId": "usuario123"
+}
