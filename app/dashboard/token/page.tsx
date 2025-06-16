@@ -84,13 +84,13 @@ function CoinCrud() {
                     setForm({ userId: "", coins: 0, usdValue: 0 });
                 }}
             >
-                <input
+                {/* <input
                     className="border px-2 py-1"
                     placeholder="User ID"
                     value={form.userId}
                     onChange={e => setForm(f => ({ ...f, userId: e.target.value }))}
                     required
-                />
+                /> */}
                 <input
                     className="border px-2 py-1"
                     type="number"
@@ -102,7 +102,7 @@ function CoinCrud() {
                 <input
                     className="border px-2 py-1"
                     type="number"
-                    step="0.01"
+
                     placeholder="USD Value"
                     value={form.usdValue}
                     onChange={e => setForm(f => ({ ...f, usdValue: Number(e.target.value) }))}
@@ -127,7 +127,6 @@ function CoinCrud() {
             <table className="w-full border">
                 <thead>
                     <tr>
-                        <th className="border px-2">User ID</th>
                         <th className="border px-2">Coins</th>
                         <th className="border px-2">USD</th>
                         <th className="border px-2">Acciones</th>
@@ -136,7 +135,6 @@ function CoinCrud() {
                 <tbody>
                     {data?.map((coin: Coin) => (
                         <tr key={coin.userId}>
-                            <td className="border px-2">{coin.userId}</td>
                             <td className="border px-2">{coin.coins}</td>
                             <td className="border px-2">${coin.usdValue.toFixed(2)}</td>
                             <td className="border px-2 flex gap-2">
