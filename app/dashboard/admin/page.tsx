@@ -1,6 +1,18 @@
 "use client"
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Table, TableHeader, TableBody, TableRow, TableCell } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
+
+interface Admin {
+    userId: string;
+    isAdmin: boolean;
+}
 
 const fetchAdmins = async () => {
     const res = await fetch("/api/admin");
@@ -38,119 +50,137 @@ const deleteAdmin = async (userId: string) => {
     return res.json();
 };
 
-// Definir tipo para Admin
-interface Admin {
-    userId: string;
-    isAdmin: boolean;
-}
-
 function AdminCrud() {
     const queryClient = useQueryClient();
     const { data, isLoading, error } = useQuery({ queryKey: ["admins"], queryFn: fetchAdmins });
 
     const createMutation = useMutation({
         mutationFn: createAdmin,
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admins"] }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admins"] });
+            toast({ title: "Admin creado correctamente" });
+        },
+        onError: () => toast({ title: "Error al crear admin", variant: "destructive" }),
     });
     const updateMutation = useMutation({
         mutationFn: updateAdmin,
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admins"] }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admins"] });
+            toast({ title: "Admin actualizado" });
+        },
+        onError: () => toast({ title: "Error al actualizar admin", variant: "destructive" }),
     });
     const deleteMutation = useMutation({
         mutationFn: deleteAdmin,
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admins"] }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admins"] });
+            toast({ title: "Admin eliminado" });
+        },
+        onError: () => toast({ title: "Error al eliminar admin", variant: "destructive" }),
     });
 
     const [form, setForm] = useState({ userId: "", isAdmin: false });
-    const [editUserId, setEditUserId] = useState<string | null>(null);
+    const [open, setOpen] = useState(false);
+    const [editMode, setEditMode] = useState(false);
 
-    if (isLoading) return <div>Cargando...</div>;
-    if (error) return <div>Error al cargar admins</div>;
+    const handleEdit = (admin: Admin) => {
+        setForm({ userId: admin.userId, isAdmin: admin.isAdmin });
+        setEditMode(true);
+        setOpen(true);
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (editMode) {
+            updateMutation.mutate(form);
+        } else {
+            createMutation.mutate(form);
+        }
+        setForm({ userId: "", isAdmin: false });
+        setEditMode(false);
+        setOpen(false);
+    };
+
+    if (isLoading) return <div className="text-center py-8">Cargando...</div>;
+    if (error) return <div className="text-center py-8 text-red-500">Error al cargar admins</div>;
 
     return (
-        <div className="max-w-xl mx-auto p-4">
-            <h2 className="text-xl font-bold mb-4">CRUD Admins</h2>
-            <form
-                className="mb-4 flex gap-2"
-                onSubmit={e => {
-                    e.preventDefault();
-                    if (editUserId) {
-                        updateMutation.mutate({ userId: form.userId, isAdmin: form.isAdmin });
-                        setEditUserId(null);
-                    } else {
-                        createMutation.mutate({ userId: form.userId, isAdmin: form.isAdmin });
-                    }
-                    setForm({ userId: "", isAdmin: false });
-                }}
-            >
-                <input
-                    className="border px-2 py-1"
-                    placeholder="User ID"
-                    value={form.userId}
-                    onChange={e => setForm(f => ({ ...f, userId: e.target.value }))}
-                    required
-                />
-                <label className="flex items-center gap-1">
-                    <input
-                        type="checkbox"
-                        checked={form.isAdmin}
-                        onChange={e => setForm(f => ({ ...f, isAdmin: e.target.checked }))}
-                    />
-                    Admin
-                </label>
-                <button className="bg-blue-500 text-white px-3 py-1 rounded" type="submit">
-                    {editUserId ? "Actualizar" : "Crear"}
-                </button>
-                {editUserId && (
-                    <button
-                        type="button"
-                        className="bg-gray-300 px-2 py-1 rounded"
-                        onClick={() => {
-                            setEditUserId(null);
-                            setForm({ userId: "", isAdmin: false });
-                        }}
-                    >
-                        Cancelar
-                    </button>
-                )}
-            </form>
-            <table className="w-full border">
-                <thead>
-                    <tr>
-                        <th className="border px-2">User ID</th>
-                        <th className="border px-2">Admin</th>
-                        <th className="border px-2">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {data?.map((admin: Admin) => (
-                        <tr key={admin.userId}>
-                            <td className="border px-2">{admin.userId}</td>
-                            <td className="border px-2">{admin.isAdmin ? "Sí" : "No"}</td>
-                            <td className="border px-2 flex gap-2">
-                                <button
-                                    type="button"
-                                    className="bg-yellow-400 px-2 py-1 rounded"
-                                    onClick={() => {
-                                        setEditUserId(admin.userId);
-                                        setForm({ userId: admin.userId, isAdmin: admin.isAdmin });
-                                    }}
-                                >
-                                    Editar
-                                </button>
-                                <button
-                                    type="button"
-                                    className="bg-red-500 text-white px-2 py-1 rounded"
-                                    onClick={() => deleteMutation.mutate(admin.userId)}
-                                >
-                                    Eliminar
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+        <Card className="max-w-2xl mx-auto mt-8 p-4 shadow-lg bg-zinc-900 border-zinc-800 text-white">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                <h2 className="text-2xl font-bold text-white">Administradores</h2>
+                <Button onClick={() => { setOpen(true); setEditMode(false); setForm({ userId: "", isAdmin: false }); }} className="bg-primary text-white hover:bg-primary/90">
+                    Nuevo admin
+                </Button>
+            </div>
+            <div className="overflow-x-auto">
+                <Table className="bg-zinc-900 text-white border-zinc-800">
+                    <TableHeader>
+                        <TableRow className="bg-zinc-800">
+                            <TableCell className="text-zinc-300">User ID</TableCell>
+                            <TableCell className="text-zinc-300">Admin</TableCell>
+                            <TableCell className="text-zinc-300">Acciones</TableCell>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {data?.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={3} className="text-center text-zinc-400">No hay admins</TableCell>
+                            </TableRow>
+                        )}
+                        {data?.map((admin: Admin) => (
+                            <TableRow key={admin.userId} className="hover:bg-zinc-800 border-zinc-800">
+                                <TableCell className="text-zinc-200">{admin.userId}</TableCell>
+                                <TableCell className="text-zinc-200">{admin.isAdmin ? "Sí" : "No"}</TableCell>
+                                <TableCell className="flex gap-2">
+                                    <Button size="sm" variant="outline" className="bg-zinc-700 text-zinc-200 hover:bg-zinc-600 border-zinc-600" onClick={() => handleEdit(admin)}>
+                                        Editar
+                                    </Button>
+                                    <Button size="sm" variant="destructive" className="bg-red-600 text-white hover:bg-red-700" onClick={() => deleteMutation.mutate(admin.userId)}>
+                                        Eliminar
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-sm w-full bg-zinc-900 border-zinc-800 text-white">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <DialogHeader>
+                            <DialogTitle className="text-white">{editMode ? "Editar admin" : "Nuevo admin"}</DialogTitle>
+                        </DialogHeader>
+                        <Input
+                            placeholder="User ID"
+                            value={form.userId}
+                            onChange={e => setForm(f => ({ ...f, userId: e.target.value }))}
+                            required
+                            disabled={editMode}
+                            className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-400 focus:ring-primary"
+                        />
+                        <label className="flex items-center gap-2 text-zinc-200">
+                            <input
+                                type="checkbox"
+                                checked={form.isAdmin}
+                                onChange={e => setForm(f => ({ ...f, isAdmin: e.target.checked }))}
+                                className="accent-primary bg-zinc-800 border-zinc-700"
+                            />
+                            Admin
+                        </label>
+                        <DialogFooter>
+                            <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90">
+                                {editMode ? "Actualizar" : "Crear"}
+                            </Button>
+                            <DialogClose asChild>
+                                <Button type="button" variant="outline" className="w-full mt-2 bg-zinc-700 text-zinc-200 hover:bg-zinc-600 border-zinc-600" onClick={() => setOpen(false)}>
+                                    Cancelar
+                                </Button>
+                            </DialogClose>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </Card>
     );
 }
 

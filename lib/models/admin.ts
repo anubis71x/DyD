@@ -7,7 +7,6 @@ const adminSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-const Admin =
-  mongoose.models.adminSchema || mongoose.model('Admin', adminSchema);
+const Admin = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
 
 export default Admin;
