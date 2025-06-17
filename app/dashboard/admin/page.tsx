@@ -101,15 +101,15 @@ function AdminCrud() {
         setOpen(false);
     };
 
-    if (isLoading) return <div className="text-center py-8">Cargando...</div>;
-    if (error) return <div className="text-center py-8 text-red-500">Error al cargar admins</div>;
+    if (isLoading) return <div className="text-center py-8">Loading...</div>;
+    if (error) return <div className="text-center py-8 text-red-500">Error loading admins</div>;
 
     return (
         <Card className="max-w-2xl mx-auto mt-8 p-4 shadow-lg bg-zinc-900 border-zinc-800 text-white">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                <h2 className="text-2xl font-bold text-white">Administradores</h2>
+                <h2 className="text-2xl font-bold text-white">Admins</h2>
                 <Button onClick={() => { setOpen(true); setEditMode(false); setForm({ userId: "", isAdmin: false }); }} className="bg-primary text-white hover:bg-primary/90">
-                    Nuevo admin
+                    New Admin
                 </Button>
             </div>
             <div className="overflow-x-auto">
@@ -118,25 +118,25 @@ function AdminCrud() {
                         <TableRow className="bg-zinc-800">
                             <TableCell className="text-zinc-300">User ID</TableCell>
                             <TableCell className="text-zinc-300">Admin</TableCell>
-                            <TableCell className="text-zinc-300">Acciones</TableCell>
+                            <TableCell className="text-zinc-300">Actions</TableCell>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {data?.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={3} className="text-center text-zinc-400">No hay admins</TableCell>
+                                <TableCell colSpan={3} className="text-center text-zinc-400">There are no admins</TableCell>
                             </TableRow>
                         )}
                         {data?.map((admin: Admin) => (
                             <TableRow key={admin.userId} className="hover:bg-zinc-800 border-zinc-800">
                                 <TableCell className="text-zinc-200">{admin.userId}</TableCell>
-                                <TableCell className="text-zinc-200">{admin.isAdmin ? "Sí" : "No"}</TableCell>
+                                <TableCell className="text-zinc-200">{admin.isAdmin ? "Yes" : "No"}</TableCell>
                                 <TableCell className="flex gap-2">
                                     <Button size="sm" variant="outline" className="bg-zinc-700 text-zinc-200 hover:bg-zinc-600 border-zinc-600" onClick={() => handleEdit(admin)}>
-                                        Editar
+                                        Edit
                                     </Button>
                                     <Button size="sm" variant="destructive" className="bg-red-600 text-white hover:bg-red-700" onClick={() => deleteMutation.mutate(admin.userId)}>
-                                        Eliminar
+                                        Delete
                                     </Button>
                                 </TableCell>
                             </TableRow>
@@ -169,11 +169,11 @@ function AdminCrud() {
                         </label>
                         <DialogFooter>
                             <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90">
-                                {editMode ? "Actualizar" : "Crear"}
+                                {editMode ? "Update" : "Create"}
                             </Button>
                             <DialogClose asChild>
                                 <Button type="button" variant="outline" className="w-full mt-2 bg-zinc-700 text-zinc-200 hover:bg-zinc-600 border-zinc-600" onClick={() => setOpen(false)}>
-                                    Cancelar
+                                    Cancel
                                 </Button>
                             </DialogClose>
                         </DialogFooter>

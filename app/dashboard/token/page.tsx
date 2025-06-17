@@ -65,12 +65,12 @@ function CoinCrud() {
     const [form, setForm] = useState({ userId: "", coins: 0, usdValue: 0 });
     const [editUserId, setEditUserId] = useState<string | null>(null);
 
-    if (isLoading) return <div>Cargando...</div>;
-    if (error) return <div>Error al cargar coins</div>;
+    if (isLoading) return <div>Loading...</div>;
+    if (error) return <div>Error loading coins</div>;
 
     return (
         <div className="max-w-xl mx-auto p-4">
-            <h2 className="text-xl font-bold mb-4">CRUD Coins</h2>
+            <h2 className="text-xl font-bold mb-4">Coins Management</h2>
             <form
                 className="mb-4 flex gap-2"
                 onSubmit={e => {
@@ -109,7 +109,7 @@ function CoinCrud() {
                     required
                 />
                 <button className="bg-blue-500 text-white px-3 py-1 rounded" type="submit">
-                    {editUserId ? "Actualizar" : "Crear"}
+                    {editUserId ? "Update" : "Create"}
                 </button>
                 {editUserId && (
                     <button
@@ -120,7 +120,7 @@ function CoinCrud() {
                             setForm({ userId: "", coins: 0, usdValue: 0 });
                         }}
                     >
-                        Cancelar
+                        Cancel
                     </button>
                 )}
             </form>
@@ -129,7 +129,7 @@ function CoinCrud() {
                     <tr>
                         <th className="border px-2">Coins</th>
                         <th className="border px-2">USD</th>
-                        <th className="border px-2">Acciones</th>
+                        <th className="border px-2">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -146,14 +146,14 @@ function CoinCrud() {
                                         setForm({ userId: coin.userId, coins: coin.coins, usdValue: coin.usdValue });
                                     }}
                                 >
-                                    Editar
+                                    Edit
                                 </button>
                                 <button
                                     type="button"
                                     className="bg-red-500 text-white px-2 py-1 rounded"
                                     onClick={() => deleteMutation.mutate(coin.userId)}
                                 >
-                                    Eliminar
+                                    Delete
                                 </button>
                             </td>
                         </tr>
