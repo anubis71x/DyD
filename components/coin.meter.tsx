@@ -88,7 +88,7 @@ export default function CoinMeter() {
       <div>
         {data && data.availablePoints === 0 && (
           <div>
-            <span className="text-red-400 text-center">You no have Points, please purchase more Points</span>
+            <span className="text-red-400 text-center">You no have Minutes, please purchase more Minutes</span>
           </div>
         )}
       </div>
