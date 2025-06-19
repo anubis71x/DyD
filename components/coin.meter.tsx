@@ -15,15 +15,15 @@ export default function CoinMeter() {
     },
   });
 
-  // Asegúrate de que coins se inicializa con los puntos disponibles
+  // Asegúrate de que coins se inicializa con los puntos disponibles - Make sure coins are initialized with available points
   const [coins, setCoins] = useState(data ? data.availablePoints : 0);
   const [minutes, setMinutes] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
 
-  const coinsPerMinute = 1000;
+  const coinsPerMinute = 1;
 
-  // Mutation para actualizar los puntos del usuario
+  // Mutation para actualizar los puntos del usuario - Mutation to update user points
   const mutation = useMutation({
     mutationFn: async (updatedCoins: number) => {
       await axios.put("/api/user", { availablePoints: updatedCoins });
@@ -39,7 +39,7 @@ export default function CoinMeter() {
   });
 
   useEffect(() => {
-    // Solo correr el intervalo si los puntos están disponibles
+    // Solo correr el intervalo si los puntos están disponibles - Only run the interval if points are available
     if (data) {
       setCoins(data.availablePoints);
     }
@@ -49,21 +49,21 @@ export default function CoinMeter() {
     if (isRunning) {
       interval = setInterval(() => {
         setCoins((prevCoins: number) => {
-          const newCoins = prevCoins - 500; // Restamos 500 puntos cada 30 segundos
+          const newCoins = prevCoins - 1; // Restamos 1 punto cada - We subtract 1 point every interval
 
-          // Si newCoins llega a 0 o menos, detenemos el contador
+          // Si newCoins llega a 0 o menos, detenemos el contador - If newCoins reaches 0 or less, we stop the counter
           if (newCoins <= 0) {
-            setIsRunning(false); // Detenemos el contador
-            clearInterval(interval!); // Limpiamos el intervalo
-            mutation.mutate(0); // Aseguramos que los puntos queden en 0
+            setIsRunning(false); // Detenemos el contador - We stop the counter
+            clearInterval(interval!); // Limpiamos el intervalo - We clear the interval
+            mutation.mutate(0); // Aseguramos que los puntos queden en 0 - We ensure the points remain at 0
             return 0;
           }
 
-          mutation.mutate(newCoins); // Actualiza el valor en la base de datos
+          mutation.mutate(newCoins); // Actualiza el valor en la base de datos - Updates the value in the database
           return newCoins;
         });
-        setMinutes((prevMinutes) => prevMinutes + 1); // Aumentamos 1 minuto
-      }, 30000);
+        setMinutes((prevMinutes) => prevMinutes + 1); // Aumentamos 1 minuto - We increase 1 minute
+      }, 60000); // Set interval to every 1 min
     } else if (interval) {
       clearInterval(interval);
     }

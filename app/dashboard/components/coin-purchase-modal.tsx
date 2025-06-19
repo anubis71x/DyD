@@ -15,9 +15,9 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   : null
 
 const coinPackages = [
-  { id: "1000_coins", amount: 1000, price: 9.99, popular: false },
-  { id: "2000_coins", amount: 2000, price: 17.99, popular: true },
-  { id: "5000_coins", amount: 5000, price: 39.99, popular: false },
+  { id: "1000_coins", amount: 60, price: 9.99, popular: false },
+  { id: "2000_coins", amount: 120, price: 17.99, popular: false },
+  { id: "5000_coins", amount: 600, price: 39.99, popular: true },
 ]
 
 export function CoinPurchaseModal({
