@@ -5,14 +5,14 @@ const servers = [
         icon: "🧙‍♂️",
         name: "ELDRATH SHADOWWEAVER",
         tags: [{ name: "Male" }, { name: "Older" }, { name: "Deep" }],
-        players: 12,
+        players: 4,
         id:"a4b711e0-c679-4448-830e-11e86a87fa78"
     },
     {
         icon: "🧙‍♀️",
         name: "LYRA MOONWHISPER",
         tags: [{ name: "Female" }, { name: "Young" }, { name: "Sweet" }],
-        players: 15,
+        players: 6,
         id:"44b23a43-92e5-4304-9e22-a10486e8ebc7"
     },
 ]

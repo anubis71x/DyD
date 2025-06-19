@@ -33,7 +33,7 @@ export function Header() {
                     <span>adventurers online:</span>
                     <div className="flex items-center">
                         <User size={16} className="mr-1" />
-                        <span className="font-semibold">500</span>
+                        <span className="font-semibold">10</span>
                     </div>
                 </div>
 
