@@ -16,7 +16,7 @@ export function CoinPurchaseButton() {
       >
         <Coins className="mr-2 h-5 w-5 hidden sm:block" /> {/* Moneda en pantallas grandes */}
         <ShoppingCart className="h-5 w-5 sm:hidden" /> {/* Carrito en móviles */}
-        <span className="hidden sm:inline">Buy Minutess</span> {/* Texto solo en pantallas grandes */}
+        <span className="hidden sm:inline">Buy Minutes</span> {/* Texto solo en pantallas grandes */}
       </Button>
       <CoinPurchaseModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </>

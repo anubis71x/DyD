@@ -85,7 +85,7 @@ export function CheckoutForm({ packageId }: { packageId: string }) {
 
             {succeeded ? (
                 <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-md mb-4">
-                    Payment successful! Your minutess have been added to your account.
+                    Payment successful! Your minutes have been added to your account.
                 </div>
             ) : (
                 <Button type="submit" disabled={!stripe || processing} className="w-full py-6">
