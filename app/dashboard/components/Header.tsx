@@ -47,7 +47,7 @@ export function Header() {
                                 {data?.availablePoints}
                             </h1>
                         </div>
-                        <div className="text-sm hidden xl:block">You have points</div>
+                        <div className="text-sm hidden xl:block">Your Minutes</div>
                     </div>
                     <div className="w-8 h-8 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
                 </div>
