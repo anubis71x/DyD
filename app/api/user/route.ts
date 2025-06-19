@@ -16,7 +16,7 @@ export const GET = async () => {
       try {
         user = await User.create({
           userId,
-          availablePoints: 5000
+          availablePoints: 15
         });
       } catch (createError: any) {
         console.log('[user_CREATE]', createError);
