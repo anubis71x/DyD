@@ -53,7 +53,7 @@ export function CoinPurchaseModal({
         <DialogHeader>
           <DialogTitle className="flex items-center justify-center text-2xl font-bold">
             <Coins className="mr-2 h-6 w-6 text-yellow-500" />
-            {isCheckout ? "Complete Your Purchase" : "Purchase Coins"}
+            {isCheckout ? "Complete Your Purchase" : "Purchase Minutes"}
           </DialogTitle>
         </DialogHeader>
 
@@ -63,7 +63,7 @@ export function CoinPurchaseModal({
 
         {!isCheckout ? (
           <div className="grid gap-4 py-4">
-            <p className="text-center text-slate-600 mb-2">Select a coin package to purchase</p>
+            <p className="text-center text-slate-600 mb-2">Select a Minutes package to purchase</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {coinPackages.map((pkg) => (
                 <CoinPackage key={pkg.id} package={pkg} onSelect={() => handlePackageSelect(pkg)} />
@@ -81,7 +81,7 @@ export function CoinPurchaseModal({
               <div className="flex justify-between items-center">
                 <div className="flex items-center">
                   <Coins className="h-5 w-5 text-yellow-500 mr-2" />
-                  <span className="font-medium">{selectedPackage?.amount} Coins</span>
+                  <span className="font-medium">{selectedPackage?.amount} Minutes</span>
                 </div>
                 <span className="font-bold">${selectedPackage?.price}</span>
               </div>
