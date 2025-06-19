@@ -32,7 +32,7 @@ export function CoinPackage({ package: pkg, onSelect }: CoinPackageProps) {
           </div>
         </div>
         <h3 className="text-2xl font-bold text-center">{pkg.amount}</h3>
-        <p className="text-center text-slate-500 text-sm mb-4">Coins</p>
+        <p className="text-center text-slate-500 text-sm mb-4">Minutes</p>
         <div className="text-center text-2xl font-bold mb-2">${pkg.price}</div>
       </CardContent>
       <CardFooter className="p-4 pt-0">
