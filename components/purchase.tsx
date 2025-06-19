@@ -29,7 +29,7 @@ const COIN_OPTIONS = [
   { value: "6", label: "6 Minutes", usd: 1 },
   { value: "12", label: "12 Minutes", usd: 2 },
   { value: "60", label: "60 Minutes", usd: 10 },
-  { value: "120", label: "100,000 Minutes", usd: 20 },
+  { value: "120", label: "1 Minute", usd: 20 },
 ];
 
 export default function CoinPurchase() {

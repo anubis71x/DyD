@@ -24,7 +24,7 @@ const Siri: React.FC<SiriProps> = ({ theme }) => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastDeductionTimeRef = useRef<number>(0)
 
-  // Consulta de puntos
+  // Consulta de puntos - check the points
   const { data: points, refetch: refetchPoints } = useQuery({
     queryKey: ['points'],
     queryFn: async () => {
@@ -47,7 +47,7 @@ const Siri: React.FC<SiriProps> = ({ theme }) => {
     },
   })
 
-  // Configuración de la onda Siri
+  // Configuracion de la onda Siri
   const [siriWaveConfig] = useState<IReactSiriwaveProps>({
     theme: theme || "ios9",
     ratio: 1,
@@ -74,8 +74,8 @@ const Siri: React.FC<SiriProps> = ({ theme }) => {
     const now = Date.now()
     if (now - lastDeductionTimeRef.current < 60000) return // Cambiado a 60000 ms (1 minuto)
 
-    if (points && points >= 500) {
-      const newBalance = points - 500
+    if (points && points >= 1) {
+      const newBalance = points - 1
       console.log("🚀 ~ deductPoints ~ newBalance:", newBalance)
       mutation.mutate(newBalance)
       lastDeductionTimeRef.current = now
@@ -91,17 +91,17 @@ const Siri: React.FC<SiriProps> = ({ theme }) => {
 
 
 
-  // Efecto para manejar el intervalo de deducción
+  // Efecto para manejar el intervalo de deduccion - Effect to handle the deduction interval
   useEffect(() => {
     if (isSessionActive) {
-      if (points === undefined || points < 500) {
+      if (points === undefined || points < 1) {
         console.log("Saldo insuficiente para iniciar/mantener llamada")
         window.location.href = "/dashboard"; // Forza una recarga total
         return
       }
 
-      deductPoints() // Deducción inicial
-      intervalRef.current = setInterval(deductPoints, 60000) // Se ejecuta cada 1 minuto
+      deductPoints() // Deduccion inicial - Initial deduction
+      intervalRef.current = setInterval(deductPoints, 60000) // Se ejecuta cada 1 minuto - Se ejecuta cada 1 minuto
     }
 
     return () => {
@@ -145,7 +145,7 @@ const Siri: React.FC<SiriProps> = ({ theme }) => {
               className={`relative p-6 rounded-full transition-colors duration-200 shadow-lg ${points < 500 ? ' cursor-not-allowed' : ''}`}
               whileTap={{ scale: 0.95 }}
               whileHover={{ scale: 1.05 }}
-              disabled={points < 500}
+              disabled={points < 1}
             >
               <AnimatePresence mode="wait">
                 <motion.div
