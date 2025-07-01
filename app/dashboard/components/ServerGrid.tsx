@@ -6,7 +6,7 @@ const servers = [
         name: "ELDRATH SHADOWWEAVER",
         tags: [{ name: "Male" }, { name: "Older" }, { name: "Deep" }],
         players: 4,
-        id:"a4b711e0-c679-4448-830e-11e86a87fa78"
+        id:"e40ba191-f39c-4914-9044-e0515a293a49"
     },
     {
         icon: "🧙‍♀️",
