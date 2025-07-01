@@ -139,8 +139,8 @@ const useVapi = ( assistantId: string) => {
 
         const contextData: any = {
           message: sessionData?.character
-            ? `You plunge through the dreampool’s shimmering membrane. Before you drifts a formless gossamer being, its voice echoing, Greetings ${sessionData.character.name}, do you wish to continue your adventure?`
-            : "You plunge through the dreampool’s shimmering membrane. Sapphire, amber, and emerald flare around you in a wild dance of light. The barrier parts with a soft ripple, spilling tendrils of liquid metal that peel from your form and roll off like quicksilver to vanish into the pool’s restless surface. Before you drifts a formless gossamer being, its voice echoing, Greetings traveler. Who stands before me?",
+            ? `<verbatim>You plunge through the dreampool’s shimmering membrane. Before you drifts a formless gossamer being, its voice echoing, Greetings ${sessionData.character.name}, do you wish to continue your adventure?</verbatim>`
+            : "<verbatim>You plunge through the dreampool’s shimmering membrane. Sapphire, amber, and emerald flare around you in a wild dance of light. The barrier parts with a soft ripple, spilling tendrils of liquid metal that peel from your form and roll off like quicksilver to vanish into the pool’s restless surface. Before you drifts a formless gossamer being, its voice echoing, Greetings traveler. Who stands before me?</verbatim>",
           sessionId: id,
           ...sessionData
         };
