@@ -139,8 +139,8 @@ const useVapi = ( assistantId: string) => {
 
         const contextData: any = {
           message: sessionData?.character
-            ? `You plunge through the dreampool’s shimmering membrane. Before you drifts a formless gossamer being, its voice echoing, Greetings ${sessionData.character.name}, do you wish to continue your adventure?`
-            : "You plunge through the dreampool’s shimmering membrane. Sapphire, amber, and emerald flare around you in a wild dance of light. The barrier parts at the edges of your vision with a soft ripple. Tendrils of liquid metal peel from your form and roll like quicksilver back into the pool’s restless mirrored surface. Before you drifts a formless gossamer being, its voice echoing, Greetings human. What is your name?",
+            ? `Greetings ${sessionData.character.name}, do you wish to continue your adventure?`
+            : "Greetings Human. What is your name?",
           sessionId: id,
           ...sessionData
         };
