@@ -16,7 +16,6 @@ const useVapi = (assistantId: string) => {
   const [sessionData, setSessionData] = useState<any>(null);
   const sessionInitialized = useRef(false);
 
-  /** 🔄 Sync `sessionIdRef` with `sessionId` */
   useEffect(() => {
     if (sessionId) {
       sessionIdRef.current = sessionId;
@@ -24,7 +23,6 @@ const useVapi = (assistantId: string) => {
     }
   }, [sessionId]);
 
-  /** 🔍 Get the user's active session */
   const fetchUserSessions = async () => {
     try {
       const response = await fetch(`/api/sessions`, { method: "GET" });
@@ -42,7 +40,6 @@ const useVapi = (assistantId: string) => {
     }
   };
 
-  /** ➕ Create a new session if none exists */
   const createSession = async () => {
     try {
       const response = await fetch(`/api/sessions`, {
@@ -64,7 +61,6 @@ const useVapi = (assistantId: string) => {
     }
   };
 
-  /** 📥 Load session data from MongoDB */
   const fetchSessionData = async (id: string) => {
     try {
       const response = await fetch(`/api/sessionData?sessionId=${id}`);
@@ -78,7 +74,6 @@ const useVapi = (assistantId: string) => {
     }
   };
 
-  /** 🧠 Initialize Vapi instance */
   const initializeVapi = useCallback(() => {
     if (!vapiRef.current) {
       const vapiInstance = new Vapi(publicKey);
@@ -119,7 +114,6 @@ const useVapi = (assistantId: string) => {
     }
   }, [sessionId]);
 
-  /** 🎚️ Start or stop a Vapi call */
   const toggleCall = async () => {
     try {
       if (isSessionActive) {
@@ -145,6 +139,10 @@ const useVapi = (assistantId: string) => {
           sessionId: id,
           ...sessionData
         };
+
+        if ("message" in contextData) {
+          delete contextData.message;
+        }
 
         if (knowledgeBaseId) {
           console.log(`📚 Using Knowledge Base ID: ${knowledgeBaseId}`);
