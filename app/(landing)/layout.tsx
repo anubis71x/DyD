@@ -1,6 +1,7 @@
 import type React from "react"
 import "./global.css"
 import type { Metadata } from "next"
+import AdSense from "@/components/AdSense"
 
 export const metadata: Metadata = {
   title: "Dreampool | Landing Page",
@@ -14,6 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <AdSense />
+      </head>
       <body>{children}</body>
     </html>
   )

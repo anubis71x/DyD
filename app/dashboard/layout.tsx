@@ -9,6 +9,7 @@ import { Footer } from "./components/Footer";
 import QueryProvider from "./queryProvider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BackgroundEffect } from "./components/background-effect";
+import AdSense from "@/components/AdSense";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,12 +26,14 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
+        <head>
+          <AdSense />
+        </head>
         <body className={inter.className}>
           <ToasterProvider />
           <QueryProvider>
             {/* Fondo animado con temática D&D */}
             <BackgroundEffect />
-            
             {/* Contenedor principal */}
             <div className="flex max-lg:flex-col min-h-screen h-full text-grey-1 overflow-y-auto relative z-10">
               <Sidebar />
