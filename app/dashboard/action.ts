@@ -22,15 +22,15 @@ function getStripe() {
 }
 
 const PACKAGE_PRICES = {
-  '1000_coins': 999, // $9.99 in cents
-  '2000_coins': 1799, // $17.99 in cents
-  '5000_coins': 3999, // $39.99 in cents
+  '1000_coins': 1000, // $10.00 in cents
+  '2000_coins': 1900, // $19.00 in cents
+  '5000_coins': 5500, // $55.00 in cents
 };
 
 const POINTS_PER_PACKAGE = {
-  '1000_coins': 1000,
-  '2000_coins': 2000,
-  '5000_coins': 5000,
+  '1000_coins': 60,
+  '2000_coins': 120,
+  '5000_coins': 360,
 };
 
 export async function createPaymentIntent(packageId: string) {

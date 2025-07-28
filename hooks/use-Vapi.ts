@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Vapi from "@vapi-ai/web";
 
-const useVapi = ( assistantId: string) => {
+const useVapi = (assistantId: string) => {
   const publicKey = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY ?? "";
 
   const router = useRouter();
@@ -16,15 +16,13 @@ const useVapi = ( assistantId: string) => {
   const [sessionData, setSessionData] = useState<any>(null);
   const sessionInitialized = useRef(false);
 
-  /** 📌 Sincronizar `sessionIdRef` con `sessionId` */
   useEffect(() => {
     if (sessionId) {
       sessionIdRef.current = sessionId;
-      console.log("🔄 sessionIdRef actualizado:", sessionIdRef.current);
+      console.log("🔄 sessionIdRef updated:", sessionIdRef.current);
     }
   }, [sessionId]);
 
-  /** 📌 Obtener la sesión activa del usuario */
   const fetchUserSessions = async () => {
     try {
       const response = await fetch(`/api/sessions`, { method: "GET" });
@@ -32,7 +30,7 @@ const useVapi = ( assistantId: string) => {
 
       if (data.length > 0) {
         console.log("✅ User session found:", data[0]._id);
-        setKnowledgeBaseId(data[0].knowledgeBaseId || null); // 🔄 Guardar KB ID
+        setKnowledgeBaseId(data[0].knowledgeBaseId || null);
         return data[0]._id;
       }
       return null;
@@ -42,7 +40,6 @@ const useVapi = ( assistantId: string) => {
     }
   };
 
-  /** 📌 Crear una nueva sesión si no hay ninguna */
   const createSession = async () => {
     try {
       const response = await fetch(`/api/sessions`, {
@@ -55,7 +52,7 @@ const useVapi = ( assistantId: string) => {
 
       const data = await response.json();
       console.log("✅ New session created:", data);
-      setKnowledgeBaseId(data.knowledgeBaseId || null); // 🔄 Guardar KB ID
+      setKnowledgeBaseId(data.knowledgeBaseId || null);
 
       return data.sessionId ?? null;
     } catch (error) {
@@ -64,21 +61,19 @@ const useVapi = ( assistantId: string) => {
     }
   };
 
-  /** 📌 Cargar datos de la sesión desde MongoDB */
   const fetchSessionData = async (id: string) => {
     try {
       const response = await fetch(`/api/sessionData?sessionId=${id}`);
       const data = await response.json();
       console.log("✅ Fetched session data:", data);
       setSessionData(data);
-      setKnowledgeBaseId(data.session?.knowledgeBaseId || null); // 🔄 Actualizar KB ID si es necesario
+      setKnowledgeBaseId(data.session?.knowledgeBaseId || null);
     } catch (error) {
       console.error("Error fetching session data:", error);
       setSessionData(null);
     }
   };
 
-  /** 📌 Inicializar Vapi */
   const initializeVapi = useCallback(() => {
     if (!vapiRef.current) {
       const vapiInstance = new Vapi(publicKey);
@@ -91,12 +86,12 @@ const useVapi = ( assistantId: string) => {
 
       vapiInstance.on("call-end", async () => {
         console.log("📞 Call ended");
-        console.log("🔄 Actualizando sessionData al terminar la sesión...");
+        console.log("🔄 Refreshing sessionData at call end...");
 
         if (sessionIdRef.current) {
           await fetchSessionData(sessionIdRef.current);
         } else {
-          console.log("⚠ No hay sessionId en sessionIdRef, no se pudo actualizar sessionData.");
+          console.log("⚠ sessionId not available in sessionIdRef, unable to update sessionData.");
         }
 
         setIsSessionActive(false);
@@ -119,7 +114,6 @@ const useVapi = ( assistantId: string) => {
     }
   }, [sessionId]);
 
-  /** 📌 Iniciar o detener la llamada con Vapi */
   const toggleCall = async () => {
     try {
       if (isSessionActive) {
@@ -133,32 +127,38 @@ const useVapi = ( assistantId: string) => {
           setSessionId(id);
           sessionIdRef.current = id;
           await fetchSessionData(id);
-        }else{
+        } else {
           sessionIdRef.current = id;
         }
 
+        const firstMessage = sessionData?.character
+          ? `You pass through the shimmering dreampool with a soft ripple. A gossamer being floats before you. Greetings ${sessionData.character.name}, do you wish to continue your adventure?`
+          : "You plunge through a shimmering membrane. Sapphire, amber, and emerald flare around you in a wild dance of light. The barrier parts at the edges of your vision with a soft ripple. Tendrils of liquid metal peel from your form and roll like quicksilver back into the pool’s restless mirrored surface. Before you drifts a formless gossamer being, its voice echoing, Greetings traveler. This is a world between worlds, an existence between existences. What is your name? And what existence do you seek to embody?";
+
         const contextData: any = {
-          message: sessionData?.character
-            ? `Greetings ${sessionData.character.name}, do you want to continue the adventure?`
-            : "Greetings, traveler. Who stands before me?",
           sessionId: id,
           ...sessionData
         };
 
+        if ("message" in contextData) {
+          delete contextData.message;
+        }
+
         if (knowledgeBaseId) {
-          console.log(`📚 Usando Knowledge Base ID: ${knowledgeBaseId}`);
+          console.log(`📚 Using Knowledge Base ID: ${knowledgeBaseId}`);
           contextData.knowledgeBaseId = knowledgeBaseId;
         }
 
-        console.log("Enviando contextData a Vapi:", contextData);
+        console.log("✅ Starting with contextData:", contextData);
+        console.log("🗣️ First message:", firstMessage);
 
         await vapiRef.current.start(assistantId, {
           context: JSON.stringify(contextData),
-          firstMessage: contextData.message
+          firstMessage
         });
       }
     } catch (err) {
-      console.error("❌ Error en toggleCall:", err);
+      console.error("❌ Error in toggleCall:", err);
     }
   };
 

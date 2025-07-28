@@ -25,11 +25,11 @@ const stripePromise = loadStripe(
 );
 
 const COIN_OPTIONS = [
-  { value: "1000", label: "1,000 coins", usd: 0.2 },
-  { value: "5000", label: "5,000 coins", usd: 1 },
-  { value: "10000", label: "10,000 coins", usd: 2 },
-  { value: "50000", label: "50,000 coins", usd: 10 },
-  { value: "100000", label: "100,000 coins", usd: 20 },
+  { value: "3", label: "3 Minutes", usd: 0.5 },
+  { value: "6", label: "6 Minutes", usd: 1 },
+  { value: "12", label: "12 Minutes", usd: 2 },
+  { value: "60", label: "60 Minutes", usd: 10 },
+  { value: "120", label: "1 Minute", usd: 20 },
 ];
 
 export default function CoinPurchase() {
