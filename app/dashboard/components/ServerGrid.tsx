@@ -13,7 +13,7 @@ const servers = [
         name: "LYRA MOONWHISPER",
         tags: [{ name: "Female" }, { name: "Young" }, { name: "Sweet" }],
         players: 6,
-        id:"ac22d3ad-1828-4fea-8426-c4d2abf6850d"
+        id:"9a4e93a6-16b1-4795-a3ce-206b4804757b"
     },
 ]
 
