@@ -133,7 +133,7 @@ const useVapi = (assistantId: string) => {
 
         const firstMessage = sessionData?.character
           ? `You pass through the shimmering dreampool with a soft ripple. A gossamer being floats before you. Greetings ${sessionData.character.name}, do you wish to continue your adventure?`
-          : "You step through a glowing portal, colors flashing around you. The barrier ripples and parts. A shimmering figure appears, its voice soft. Greetings, traveler. This is a world between worlds. What is your name, and what path do you choose?";
+          : "You step through a glowing portal, colors flashing around you. The barrier ripples and parts. A shimmering figure appears, its voice soft. Greetings, traveler. Saludos. Go aisatsu. This is a world between worlds. What is your name, and what path do you choose?";
 
         const contextData: any = {
           sessionId: id,
