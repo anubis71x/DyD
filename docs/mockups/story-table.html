@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dreampool Story Table Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Plan: dark-fantasy "table at night". Ink-blue neutrals, parchment text, one accent per storyteller
+   that tints the whole table. Layout: picker gallery → 3-zone Story Table (rail · feed + voice panel · scene/dice side panel). */
+:root{
+  --ink:#0d1015;
+  --surface:#151a22;
+  --surface-2:#1c222d;
+  --line:#2a3240;
+  --text:#ebe6da;
+  --muted:#9ba3b1;
+  --accent:#d38b4c;
+  --accent-soft:rgba(211,139,76,.14);
+  --good:#7fbf8e;
+  --bad:#e07a6e;
+  --font-display:"Cormorant Garamond", "Iowan Old Style", Georgia, serif;
+  --font-body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  --r:14px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ink);color:var(--text);font:15px/1.55 var(--font-body);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;text-wrap:balance;margin:0;letter-spacing:.01em}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.view{display:none;height:100%}
+.view.active{display:flex}
+.demo-note{display:none;position:fixed;right:12px;bottom:12px;z-index:50;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);padding:6px 10px;border-radius:999px}
+
+/* ---------- Picker ---------- */
+#storytellers{flex-direction:column;overflow-y:auto}
+.picker{max-width:1180px;margin:0 auto;padding:40px 24px 80px;width:100%;display:flex;flex-direction:column;gap:28px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:.04em}
+.brand-mark{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff8 0 12%,transparent 13%),radial-gradient(circle,var(--accent),#0000 70%);box-shadow:0 0 18px var(--accent)}
+.steps{display:flex;gap:8px;flex-wrap:wrap;font-size:13px}
+.step{padding:5px 12px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.step.on{border-color:var(--accent);color:var(--text);background:var(--accent-soft)}
+.picker-head{display:flex;flex-direction:column;gap:8px;max-width:62ch}
+.picker-head h1{font-size:clamp(34px,5vw,52px);line-height:1.05}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+.st-card{--c:#d38b4c;position:relative;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:0;overflow:hidden;display:flex;flex-direction:column;transition:transform .2s,border-color .2s,box-shadow .2s}
+.st-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--c) 60%,var(--line))}
+.st-card[aria-pressed="true"]{border-color:var(--c);box-shadow:0 0 0 1px var(--c),0 18px 50px -20px var(--c)}
+.portrait{height:190px;position:relative;display:grid;place-items:center;overflow:hidden}
+.portrait canvas{position:absolute;inset:0;width:100%;height:100%}
+.portrait .initial{position:relative;font-family:var(--font-display);font-size:92px;font-weight:700;color:#fff;opacity:.92;text-shadow:0 4px 30px var(--c)}
+.st-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
+.st-body h2{font-size:24px;line-height:1.1}
+.tagline{color:var(--muted);font-size:14px;min-height:42px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.st-foot{flex-wrap:wrap;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:6px}
+.sample{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 12px 6px 8px;font-size:13px}
+.sample:hover{border-color:var(--c)}
+.sample .play{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--c);color:#111;font-size:10px}
+.sample .bars{display:none;gap:2px;align-items:center;height:14px}
+.sample.playing .bars{display:inline-flex}
+.sample.playing .lbl{display:none}
+.bars i{width:3px;background:var(--c);border-radius:2px;animation:bar 0.9s ease-in-out infinite}
+.bars i:nth-child(2){animation-delay:.15s}.bars i:nth-child(3){animation-delay:.3s}.bars i:nth-child(4){animation-delay:.45s}.bars i:nth-child(5){animation-delay:.6s}
+@keyframes bar{0%,100%{height:3px}50%{height:14px}}
+.langs{font-size:12px;color:var(--muted)}
+.example-badge{position:absolute;top:10px;left:10px;font-size:11px;padding:3px 8px;border-radius:999px;background:#0009;color:var(--muted);border:1px solid #fff2}
+.selected-badge{position:absolute;top:10px;right:10px;font-size:11px;padding:3px 9px;border-radius:999px;background:var(--c);color:#111;font-weight:700;display:none}
+.st-card[aria-pressed="true"] .selected-badge{display:block}
+.sample-line{font-family:var(--font-display);font-style:italic;font-size:15px;color:var(--text);border-left:2px solid var(--c);padding-left:10px;display:none}
+.st-card .sample-line.show{display:block}
+.picker-bar{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border:1px solid var(--line);border-radius:16px;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(8px)}
+.btn{text-decoration:none;color:var(--text);display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:10px 18px;border:1px solid var(--line);background:var(--surface-2);font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#14100b}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+
+/* ---------- Story Table ---------- */
+#table{flex-direction:column}
+.topbar{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.topbar .brand{font-size:18px}
+.camp{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.camp b{font-family:var(--font-display);font-size:19px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.camp span{font-size:12px;color:var(--muted)}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);white-space:nowrap}
+.coin{width:10px;height:10px;border-radius:50%;background:#e8c060;box-shadow:0 0 6px #e8c06099}
+.layout{flex:1;min-height:0;display:grid;grid-template-columns:64px minmax(0,1fr) 380px}
+.rail{border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0;background:var(--surface)}
+.rail button{width:46px;height:46px;border-radius:12px;border:1px solid transparent;background:transparent;display:grid;place-items:center;color:var(--muted);position:relative}
+.rail button:hover,.rail button[aria-expanded="true"]{background:var(--surface-2);color:var(--text);border-color:var(--line)}
+.rail svg{width:22px;height:22px}
+.rail .dot{position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%;background:var(--accent);display:none}
+.rail .dot.on{display:block}
+.rail small{font-size:10px;color:var(--muted);margin-top:-2px;margin-bottom:6px}
+
+.center{position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.feed{flex:1;overflow-y:auto;padding:24px clamp(16px,4vw,48px) 16px;display:flex;flex-direction:column;gap:18px;scroll-behavior:smooth}
+.recap{border:1px solid var(--line);background:linear-gradient(135deg,var(--accent-soft),transparent 60%),var(--surface);border-radius:var(--r);padding:14px 16px;max-width:68ch}
+.recap h3{font-size:18px;margin-bottom:4px}
+.recap p{margin:0;color:var(--muted);font-size:14px}
+.line{max-width:68ch;display:flex;gap:12px;animation:rise .35s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.line .av{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-display);font-weight:700;font-size:18px;color:#111}
+.line .who{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center;margin-bottom:2px}
+.line .voice{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line)}
+.line.narration .txt{font-family:var(--font-display);font-size:20px;line-height:1.45;color:var(--text)}
+.line.npc .txt{font-size:16px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--npc,#888);padding:9px 13px;border-radius:4px 12px 12px 12px}
+.line.player{align-self:flex-end;flex-direction:row-reverse;text-align:right}
+.line.player .txt{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));padding:9px 13px;border-radius:12px 4px 12px 12px}
+.line.speaking .txt{box-shadow:0 0 0 1px var(--accent)}
+.line.narration.speaking .txt{box-shadow:none;text-shadow:0 0 18px color-mix(in srgb,var(--accent) 35%,transparent)}
+.sys{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;max-width:68ch}
+.sys::before{content:"";width:18px;height:1px;background:var(--line)}
+.sys b{color:var(--text);font-weight:600}
+.cut{color:var(--muted);font-style:italic}
+
+.choices{display:flex;flex-wrap:wrap;gap:8px;padding:0 clamp(16px,4vw,48px) 12px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-size:14px}
+.chip:hover{border-color:var(--accent);background:var(--accent-soft)}
+.chip.other{color:var(--muted);border-style:dashed}
+
+/* Voice input panel */
+.voice-panel{margin:0 clamp(12px,3vw,32px) 14px;border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center}
+.mic{width:64px;height:64px;border-radius:50%;border:none;background:var(--surface-2);display:grid;place-items:center;position:relative;transition:background .2s}
+.mic svg{width:26px;height:26px}
+.mic::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--accent);opacity:0;transform:scale(.9);transition:.2s}
+.mic.live{background:var(--accent);color:#14100b}
+.mic.live::after{opacity:.6;animation:pulse 1.4s ease-out infinite}
+@keyframes pulse{from{transform:scale(.95);opacity:.7}to{transform:scale(1.25);opacity:0}}
+.vp-mid{display:flex;flex-direction:column;gap:6px;min-width:0}
+.vp-status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.vp-status b{color:var(--text);font-weight:600}
+.state-dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.state-dot.listen{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+.state-dot.speak{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.wave{width:100%;height:38px;display:block}
+.partial{font-size:15px;min-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.partial .caret{display:inline-block;width:2px;height:15px;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.text-entry{display:none;gap:8px}
+.text-entry textarea{flex:1;resize:none;height:44px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;color:var(--text);padding:10px 12px;font:inherit}
+.voice-panel.text .text-entry{display:flex}
+.voice-panel.text .wave,.voice-panel.text .partial{display:none}
+.voice-panel.text .mic{opacity:.35;pointer-events:none}
+.vp-right{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--surface-2)}
+.seg button{border:none;background:transparent;border-radius:999px;padding:5px 11px;font-size:12px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
+.hint{font-size:11px;color:var(--muted)}
+kbd{font-family:var(--font-mono);font-size:10px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px}
+
+/* Drawer */
+.drawer{position:absolute;top:0;bottom:0;left:0;width:min(360px,100%);background:var(--surface);border-right:1px solid var(--line);box-shadow:20px 0 60px -30px #000;transform:translateX(-102%);transition:transform .25s ease,visibility 0s .25s;visibility:hidden;z-index:5;display:flex;flex-direction:column}
+.drawer.open{transform:none;visibility:visible;transition:transform .25s ease}
+.drawer header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.drawer header h2{font-size:22px}
+.x{border:none;background:var(--surface-2);width:32px;height:32px;border-radius:8px}
+.drawer .body{padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;background:var(--surface-2)}
+.stat b{display:block;font-family:var(--font-mono);font-size:18px}
+.stat span{font-size:11px;color:var(--muted)}
+.meter{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.meter .track{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;border:1px solid var(--line)}
+.meter .fill{height:100%;border-radius:99px;transition:width .6s ease}
+.list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.list li{border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:9px 11px;font-size:14px}
+.list li small{display:block;color:var(--muted);font-size:12px}
+.flash{animation:flash 1.6s ease}
+@keyframes flash{0%,40%{background:var(--accent-soft);border-color:var(--accent)}}
+.npc-row{display:flex;gap:10px;align-items:center}
+.npc-row .av{width:34px;height:34px;border-radius:50%;flex:none;display:grid;place-items:center;font-family:var(--font-display);font-weight:700;color:#111}
+.npc-row .grow{flex:1;min-width:0}
+.mini{font-size:12px;border:1px solid var(--line);background:transparent;border-radius:999px;padding:3px 9px}
+.disp{font-size:11px;padding:1px 7px;border-radius:999px}
+.disp.friendly{background:#7fbf8e22;color:var(--good)}
+.disp.neutral{background:#9ba3b122;color:var(--muted)}
+.disp.hostile{background:#e07a6e22;color:var(--bad)}
+
+/* Side panel */
+.side{border-left:1px solid var(--line);background:var(--surface);overflow-y:auto;display:flex;flex-direction:column}
+.panel{padding:16px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid var(--line)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.panel-head h2{font-size:21px}
+.scene{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);aspect-ratio:4/3;background:#000}
+.scene canvas{width:100%;height:100%;display:block;transition:opacity .6s}
+.scene .cap{position:absolute;left:0;right:0;bottom:0;padding:24px 12px 10px;background:linear-gradient(transparent,#000c);font-size:13px}
+.scene .cap b{font-family:var(--font-display);font-size:17px;display:block}
+.scene .gen{position:absolute;top:10px;left:10px;font-size:11px;padding:3px 8px;border-radius:999px;background:#000a;border:1px solid #fff2;display:none}
+.scene.loading .gen{display:block}
+.scene.loading canvas{opacity:.35}
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.thumbs button{padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;aspect-ratio:1;background:#000}
+.thumbs button[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.thumbs canvas{width:100%;height:100%;display:block}
+
+.check{border:1px solid var(--accent);background:var(--accent-soft);border-radius:12px;padding:10px 12px;display:none;flex-direction:column;gap:4px}
+.check.on{display:flex}
+.check b{font-family:var(--font-display);font-size:18px}
+.check .row{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.tray{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:center}
+.die-stage{width:120px;height:120px;display:grid;place-items:center;position:relative}
+.die-stage svg{width:110px;height:110px;filter:drop-shadow(0 8px 18px #0008)}
+.die-stage.rolling svg{animation:tumble .9s cubic-bezier(.3,.7,.4,1)}
+@keyframes tumble{0%{transform:rotate(0) scale(.85)}60%{transform:rotate(620deg) scale(1.08)}100%{transform:rotate(720deg) scale(1)}}
+.die-num{font-family:var(--font-mono);font-weight:700;font-size:26px;fill:#14100b}
+.result{display:flex;flex-direction:column;gap:2px}
+.result .total{font-family:var(--font-mono);font-size:40px;font-weight:700;line-height:1}
+.result .total.good{color:var(--good)}.result .total.bad{color:var(--bad)}
+.result .break{font-size:13px;color:var(--muted)}
+.result .verdict{font-family:var(--font-display);font-size:19px}
+.dice-row{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.dice-row button{border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:8px 0;font-family:var(--font-mono);font-size:12px}
+.dice-row button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.roll-ctl{display:flex;gap:8px;align-items:center}
+.mod{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:var(--surface-2)}
+.mod button{border:none;background:transparent;width:30px;height:34px}
+.mod span{min-width:34px;text-align:center}
+.roll-btn{flex:1;justify-content:center}
+.adv{display:flex;gap:6px}
+.history{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none;font-size:13px}
+.history li{display:flex;justify-content:space-between;gap:8px;color:var(--muted);border-bottom:1px dashed var(--line);padding-bottom:5px}
+.history li b{color:var(--text)}
+.server-note{font-size:11px;color:var(--muted)}
+
+@media (max-width:1100px){
+  .layout{grid-template-columns:56px minmax(0,1fr) 320px}
+}
+@media (max-width:860px){
+  #table{height:auto;min-height:100%}
+  .layout{grid-template-columns:1fr;grid-template-rows:auto auto auto}
+  .rail{flex-direction:row;justify-content:space-around;border-right:none;border-bottom:1px solid var(--line);padding:6px}
+  .rail small{display:none}
+  .center{min-height:70vh}
+  .feed{max-height:60vh}
+  .side{border-left:none;border-top:1px solid var(--line)}
+  .voice-panel{position:sticky;bottom:8px;grid-template-columns:auto 1fr;box-shadow:0 10px 40px -10px #000}
+  .vp-right{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center}
+  .topbar .hide-sm{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+#storytellers.active ~ .demo-note{display:block}
+</style>
+</head>
+<body>
+
+<!-- ============ VIEW 1: Storyteller picker ============ -->
+<section id="storytellers" class="view" aria-label="Choose a storyteller">
+  <div class="picker">
+    <div class="brand"><span class="brand-mark"></span>Dreampool</div>
+    <div class="steps" aria-label="New campaign steps">
+      <span class="step on">1 · Storyteller</span><span class="step">2 · World</span><span class="step">3 · Character</span>
+    </div>
+    <div class="picker-head">
+      <h1>Who will tell your story?</h1>
+      <p class="muted">Your storyteller narrates, sets the pace and runs the rules. They keep their own voice for narration, and cast other voices for every character you meet.</p>
+    </div>
+    <div class="cards" id="cards"></div>
+    <div class="picker-bar">
+      <div><span class="muted">Selected:</span> <b id="pickedName">Eldrath Shadowweaver</b> <span class="muted" id="pickedStyle"></span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn ghost" href="#table" id="skip">Continue saved campaign</a>
+        <a class="btn primary" href="#table" id="begin">Begin with Eldrath →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VIEW 2: Story Table ============ -->
+<section id="table" class="view" aria-label="Story Table">
+  <header class="topbar">
+    <a href="#storytellers" class="brand" style="text-decoration:none;color:inherit" aria-label="Back to storytellers"><span class="brand-mark"></span></a>
+    <div class="camp"><b>The Salt Lantern</b><span id="campSub">Session 4 · told by Eldrath Shadowweaver</span></div>
+    <div class="spacer"></div>
+    <span class="pill hide-sm" title="Saved automatically after every change">✓ Saved · rev <span class="mono" id="rev">212</span></span>
+    <span class="pill hide-sm muted">Mockup · scripted demo</span>
+    <span class="pill"><span class="coin"></span><span class="mono" id="coins">42</span> coins</span>
+  </header>
+
+  <div class="layout">
+    <!-- Rail -->
+    <nav class="rail" aria-label="Campaign panels">
+      <button data-drawer="character" aria-expanded="false" aria-label="Character"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span class="dot" id="dot-character"></span></button><small>Hero</small>
+      <button data-drawer="quests" aria-expanded="false" aria-label="Quests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h10l2 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></svg><span class="dot" id="dot-quests"></span></button><small>Quests</small>
+      <button data-drawer="npcs" aria-expanded="false" aria-label="Characters met"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="9" r="3.2"/><circle cx="16.5" cy="10" r="2.6"/><path d="M3 20c1-3.5 3.3-5 6-5s5 1.5 6 5M14 15.5c2.6-.6 5.3.6 6.5 4"/></svg><span class="dot" id="dot-npcs"></span></button><small>Cast</small>
+      <button data-drawer="map" aria-expanded="false" aria-label="Map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg></button><small>Map</small>
+    </nav>
+
+    <!-- Center: feed + voice panel -->
+    <main class="center">
+      <aside class="drawer" id="drawer" aria-hidden="true">
+        <header><h2 id="drawerTitle">Character</h2><button class="x" id="drawerClose" aria-label="Close panel">✕</button></header>
+        <div class="body" id="drawerBody"></div>
+      </aside>
+
+      <div class="feed" id="feed" aria-live="polite"></div>
+      <div class="choices" id="choices" aria-label="Suggested actions"></div>
+
+      <section class="voice-panel" id="voicePanel" aria-label="Voice input">
+        <button class="mic" id="mic" aria-label="Start talking" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        </button>
+        <div class="vp-mid">
+          <div class="vp-status"><span class="state-dot" id="stateDot"></span><span id="stateText"><b>Ready.</b> Tap the mic and speak, or choose an action.</span></div>
+          <canvas class="wave" id="wave" aria-hidden="true"></canvas>
+          <div class="partial" id="partial"><span class="muted">What you say appears here as you speak.</span></div>
+          <form class="text-entry" id="textForm">
+            <label for="textIn" class="muted" style="position:absolute;left:-9999px">Type your action</label>
+            <textarea id="textIn" placeholder="Type what you do or say…"></textarea>
+            <button class="btn primary" type="submit">Send</button>
+          </form>
+        </div>
+        <div class="vp-right">
+          <div class="seg" role="group" aria-label="Input mode">
+            <button data-mode="ptt" aria-pressed="true">Tap to talk</button>
+            <button data-mode="open" aria-pressed="false">Open mic</button>
+            <button data-mode="text" aria-pressed="false">Text</button>
+          </div>
+          <span class="hint" id="modeHint">Talk while the storyteller speaks to interrupt</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- Side panel: scene art + dice -->
+    <aside class="side" aria-label="Scene and dice">
+      <section class="panel" aria-labelledby="sceneH">
+        <div class="panel-head"><h2 id="sceneH">Scene</h2><button class="mini" id="illustrate">Illustrate this moment</button></div>
+        <div class="scene" id="scene">
+          <canvas id="sceneCanvas" width="640" height="480"></canvas>
+          <span class="gen">Painting…</span>
+          <div class="cap"><b id="sceneTitle">Harbormaster's Office</b><span class="muted" id="sceneSub">Port Halloway · night, rain on the glass</span></div>
+        </div>
+        <div class="thumbs" id="thumbs" aria-label="Scene gallery"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="diceH">
+        <div class="panel-head"><h2 id="diceH">Dice</h2><span class="server-note">Rolled on the server</span></div>
+        <div class="check" id="check" role="status">
+          <b id="checkTitle">Sleight of Hand check</b>
+          <div class="row"><span>Requested by the storyteller</span><span class="mono" id="checkDC">DC 14</span></div>
+          <div class="row"><span>Your modifier</span><span class="mono">+5 (DEX)</span></div>
+        </div>
+        <div class="tray">
+          <div class="die-stage" id="dieStage">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <polygon points="50,4 92,27 92,73 50,96 8,73 8,27" fill="var(--accent)"/>
+              <polygon points="50,20 80,70 20,70" fill="#0002" stroke="#0003" stroke-width="1.5"/>
+              <path d="M50 4 50 20 M92 27 80 70 M8 27 20 70 M50 96 50 70 M92 73 80 70 M8 73 20 70 M8 27 50 20 92 27" stroke="#0003" stroke-width="1.5" fill="none"/>
+              <text x="50" y="60" text-anchor="middle" class="die-num" id="dieNum">20</text>
+            </svg>
+          </div>
+          <div class="result" aria-live="polite">
+            <span class="total mono" id="total">—</span>
+            <span class="break mono" id="break">Choose a die and roll</span>
+            <span class="verdict" id="verdict"></span>
+          </div>
+        </div>
+        <div class="dice-row" role="group" aria-label="Die type" id="diceRow"></div>
+        <div class="roll-ctl">
+          <div class="mod" aria-label="Modifier"><button id="modDown" aria-label="Lower modifier">−</button><span class="mono" id="modVal">+5</span><button id="modUp" aria-label="Raise modifier">+</button></div>
+          <div class="adv seg" role="group" aria-label="Advantage">
+            <button data-adv="none" aria-pressed="true">Normal</button><button data-adv="adv" aria-pressed="false">Adv</button><button data-adv="dis" aria-pressed="false">Dis</button>
+          </div>
+        </div>
+        <button class="btn primary roll-btn" id="rollBtn">Roll d20 + 5</button>
+        <ul class="history" id="history" aria-label="Roll history">
+          <li><span>Perception</span><b class="mono">d20+2 → 17</b></li>
+          <li><span>Shortsword damage</span><b class="mono">d6+3 → 7</b></li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+</section>
+
+<div class="demo-note">Mockup · scripted demo, no real audio</div>
+
+<script>
+(() => {
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, reduce ? Math.min(ms, 60) : ms));
+
+/* ---------- Data ---------- */
+const STORYTELLERS = [
+  { id:'eldrath', name:'Eldrath Shadowweaver', c:'#d38b4c', voice:'Ember Baritone', tagline:'Old, unhurried, and fond of a grim twist. Every candle in his stories casts a long shadow.', tags:['Grim','Slow burn','Rules-light'], langs:'English · Español', sample:'“The door was never locked, traveler. It was waiting.”' },
+  { id:'lyra', name:'Lyra Moonwhisper', c:'#8fb8d8', voice:'Silver Mezzo', tagline:'Bright, curious and kind. Fairy-tale wonder with real stakes underneath.', tags:['Whimsical','Exploration','Gentle'], langs:'English · 日本語', sample:'“Oh, look. The river is humming your name. Shall we follow it?”' },
+  { id:'quill', name:'Brother Quill', c:'#c9a35a', voice:'Warm Tenor', tagline:'A chatty monk-scribe who loves tavern gossip, terrible puns and a good meal.', tags:['Cozy','Comedy','Roleplay'], langs:'English', sample:'“Ah, a quest! First, though: have you tried the stew?”', example:true },
+  { id:'vey', name:'Captain Vey', c:'#cf6f66', voice:'Clipped Alto', tagline:'A retired war captain. Tight pacing, clear stakes, and every choice has a cost.', tags:['Tactical','Fast','Rules-heavy'], langs:'English · Español', sample:'“Three exits. Two are guarded. You have ten seconds.”', example:true },
+];
+const NPC = {
+  venn:  { name:'Harbormaster Venn', c:'#b9a27c', voice:'Gravel Baritone', disp:'neutral', note:'Suspicious of you. Owes the Choir money.' },
+  mirel: { name:'Mirel', c:'#9fd3b7', voice:'Bright Youth', disp:'friendly', note:'Lamplighter’s apprentice. Hid your boat.' },
+  choir: { name:'The Tide Choir', c:'#7f8fd8', voice:'Layered Whisper · custom', disp:'hostile', note:'Drowned voices beneath the harbor.' },
+};
+let st = STORYTELLERS[0];
+
+/* ---------- Generative art ---------- */
+function rng(seed){ let s = seed >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+function hexA(hex, a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; }
+function paintPortrait(cv, seed, color){
+  const w = cv.width = cv.clientWidth * 2 || 500, h = cv.height = cv.clientHeight * 2 || 380, x = cv.getContext('2d'), r = rng(seed);
+  const g = x.createLinearGradient(0,0,0,h); g.addColorStop(0,'#0b0e13'); g.addColorStop(1,hexA(color,.55));
+  x.fillStyle = g; x.fillRect(0,0,w,h);
+  for (let i=0;i<7;i++){ x.beginPath(); x.arc(w/2, h*0.52, 40 + i*26 + r()*10, 0, Math.PI*2); x.strokeStyle = hexA(color, .08 + r()*.12); x.lineWidth = 1 + r()*2; x.stroke(); }
+  for (let i=0;i<90;i++){ x.fillStyle = `rgba(255,255,255,${r()*.5})`; x.fillRect(r()*w, r()*h*.7, 1.5, 1.5); }
+  const rg = x.createRadialGradient(w/2,h*.52,0,w/2,h*.52,w*.45); rg.addColorStop(0,hexA(color,.55)); rg.addColorStop(1,'transparent');
+  x.fillStyle = rg; x.fillRect(0,0,w,h);
+}
+const SCENES = [
+  { title:"Harbormaster's Office", sub:'Port Halloway · night, rain on the glass', seed:11, kind:'room' },
+  { title:'The Drowned Steps', sub:'Low tide · the Choir is singing', seed:42, kind:'sea' },
+  { title:'Lantern Quay', sub:'Where Mirel hid the boat', seed:7, kind:'quay' },
+];
+let sceneIdx = 0;
+function paintScene(cv, sc, color){
+  const w = cv.width, h = cv.height, x = cv.getContext('2d'), r = rng(sc.seed);
+  const sky = x.createLinearGradient(0,0,0,h);
+  sky.addColorStop(0, sc.kind==='sea' ? '#0a1222' : '#120f14'); sky.addColorStop(.65, sc.kind==='room' ? '#2a1d16' : '#1a2536'); sky.addColorStop(1,'#07090c');
+  x.fillStyle = sky; x.fillRect(0,0,w,h);
+  if (sc.kind === 'room') {
+    // window with rain, desk, lantern
+    x.fillStyle = '#0d1624'; x.fillRect(w*.56,h*.12,w*.32,h*.42);
+    for (let i=0;i<120;i++){ x.strokeStyle='rgba(160,190,220,.25)'; const px=w*.56+r()*w*.32, py=h*.12+r()*h*.42; x.beginPath(); x.moveTo(px,py); x.lineTo(px-3,py+12); x.stroke(); }
+    x.strokeStyle='#3a2a1e'; x.lineWidth=10; x.strokeRect(w*.56,h*.12,w*.32,h*.42); x.beginPath(); x.moveTo(w*.72,h*.12); x.lineTo(w*.72,h*.54); x.stroke();
+    x.fillStyle='#2b1c12'; x.fillRect(0,h*.68,w,h*.32);
+    x.fillStyle='#3d2817'; x.fillRect(w*.08,h*.62,w*.62,h*.08);
+    for (let i=0;i<5;i++){ x.fillStyle=`rgba(230,215,180,${.5+r()*.3})`; x.save(); x.translate(w*(.14+i*.09),h*.6); x.rotate((r()-.5)*.4); x.fillRect(0,0,w*.07,h*.03); x.restore(); }
+    glow(x, w*.3, h*.5, w*.42, color, .55);
+    x.fillStyle = color; x.fillRect(w*.285,h*.47,w*.03,h*.06);
+  } else if (sc.kind === 'sea') {
+    x.fillStyle='#d9e4f2'; x.beginPath(); x.arc(w*.72,h*.2,h*.07,0,Math.PI*2); x.fill(); glow(x,w*.72,h*.2,h*.3,'#9fb6d8',.4);
+    for (let i=0;i<9;i++){ x.fillStyle=`rgba(${20+i*6},${40+i*8},${70+i*9},.9)`; x.beginPath(); const y0=h*.5+i*h*.06; x.moveTo(0,y0); for(let px=0;px<=w;px+=20) x.lineTo(px, y0 + Math.sin(px*.02+i+r())*6); x.lineTo(w,h); x.lineTo(0,h); x.fill(); }
+    x.fillStyle='#1b1f27'; for (let i=0;i<6;i++){ x.fillRect(w*.1+i*w*.07, h*.62+i*h*.05, w*.22, h*.025); }
+    for (let i=0;i<14;i++){ glow(x, w*(.2+r()*.6), h*(.62+r()*.3), 10+r()*18, '#8fa0ff', .5); }
+  } else {
+    for (let i=0;i<3;i++){ x.fillStyle=`rgba(15,18,24,${.7+i*.1})`; x.beginPath(); x.moveTo(0,h*(.55+i*.06)); for(let px=0;px<=w;px+=w/8) x.lineTo(px,h*(.45+i*.06)-r()*h*.12); x.lineTo(w,h); x.lineTo(0,h); x.fill(); }
+    x.fillStyle='#0b1a28'; x.fillRect(0,h*.78,w,h*.22);
+    for (let i=0;i<7;i++){ const lx=w*(.08+i*.14), ly=h*(.56+r()*.12); x.fillStyle='#222'; x.fillRect(lx,ly,3,h*.78-ly); glow(x,lx+1,ly,26,color,.7); x.fillStyle=hexA(color,.25); x.fillRect(lx-6,h*.8,15,h*.12); }
+  }
+  // vignette
+  const v = x.createRadialGradient(w/2,h/2,h*.3,w/2,h/2,w*.75); v.addColorStop(0,'transparent'); v.addColorStop(1,'rgba(0,0,0,.7)'); x.fillStyle=v; x.fillRect(0,0,w,h);
+}
+function glow(x,cx,cy,rad,color,a){ const g=x.createRadialGradient(cx,cy,0,cx,cy,rad); g.addColorStop(0,hexA(color,a)); g.addColorStop(1,'transparent'); x.fillStyle=g; x.fillRect(cx-rad,cy-rad,rad*2,rad*2); }
+
+/* ---------- Picker ---------- */
+const cards = $('#cards');
+STORYTELLERS.forEach((s, i) => {
+  const el = document.createElement('div');
+  el.innerHTML = `<button class="st-card" style="--c:${s.c}" aria-pressed="${i===0}" data-id="${s.id}">
+    <div class="portrait"><canvas></canvas><span class="initial">${s.name[0]}</span>${s.example?'<span class="example-badge">New idea</span>':''}<span class="selected-badge">Selected</span></div>
+    <div class="st-body">
+      <h2>${s.name}</h2>
+      <p class="tagline" style="margin:0">${s.tagline}</p>
+      <div class="tags">${s.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+      <p class="sample-line" style="margin:0">${s.sample}</p>
+      <div class="st-foot">
+        <span class="sample" role="button" tabindex="0" aria-label="Hear a sample of ${s.name}"><span class="play">▶</span><span class="lbl">Hear a sample</span><span class="bars"><i></i><i></i><i></i><i></i><i></i></span></span>
+        <span class="langs">${s.langs}</span>
+      </div>
+    </div></button>`;
+  const card = el.firstElementChild; cards.appendChild(card);
+  requestAnimationFrame(() => paintPortrait(card.querySelector('canvas'), 100 + i*37, s.c));
+  card.addEventListener('click', e => {
+    if (e.target.closest('.sample')) { playSample(card); return; }
+    pick(s);
+  });
+  card.querySelector('.sample').addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') { e.preventDefault(); e.stopPropagation(); playSample(card); } });
+});
+function playSample(card){
+  const sm = card.querySelector('.sample'), line = card.querySelector('.sample-line');
+  document.querySelectorAll('.sample.playing').forEach(x => x !== sm && x.classList.remove('playing'));
+  sm.classList.add('playing'); line.classList.add('show');
+  clearTimeout(sm._t); sm._t = setTimeout(() => sm.classList.remove('playing'), 2600);
+}
+function setAccent(c){
+  document.documentElement.style.setProperty('--accent', c);
+  document.documentElement.style.setProperty('--accent-soft', hexA(c,.14));
+}
+function pick(s){
+  st = s; setAccent(s.c);
+  document.querySelectorAll('.st-card').forEach(c => c.setAttribute('aria-pressed', c.dataset.id === s.id));
+  $('#pickedName').textContent = s.name;
+  $('#pickedStyle').textContent = '· ' + s.tags.join(', ') + ' · narration voice: ' + s.voice;
+  $('#begin').textContent = `Begin with ${s.name.split(' ')[0]} →`;
+  $('#campSub').textContent = `Session 4 · told by ${s.name}`;
+  renderThumbs(); paintScene($('#sceneCanvas'), SCENES[sceneIdx], st.c);
+}
+
+/* ---------- Routing ---------- */
+function route(){
+  const v = location.hash === '#table' ? 'table' : 'storytellers';
+  document.querySelectorAll('.view').forEach(x => x.classList.toggle('active', x.id === v));
+  if (v === 'table') { sizeWave(); if (!started) start(); }
+  else document.querySelectorAll('.st-card canvas').forEach((cv,i)=>paintPortrait(cv,100+i*37,STORYTELLERS[i].c));
+}
+addEventListener('hashchange', route);
+
+/* ---------- Feed ---------- */
+const feed = $('#feed');
+let started = false, speaking = false, cancelSpeech = false;
+function scrollFeed(){ feed.scrollTop = feed.scrollHeight; }
+function sys(html){ const d=document.createElement('div'); d.className='sys'; d.innerHTML=html; feed.appendChild(d); scrollFeed(); }
+function addLine(kind, text, who){
+  const d = document.createElement('div'); d.className = 'line ' + kind;
+  if (kind === 'narration') {
+    d.innerHTML = `<div class="av" style="background:${st.c}">${st.name[0]}</div><div><div class="who">${st.name} <span class="voice">${st.voice}</span></div><div class="txt"></div></div>`;
+  } else if (kind === 'npc') {
+    const n = NPC[who];
+    d.style.setProperty('--npc', n.c);
+    d.innerHTML = `<div class="av" style="background:${n.c}">${n.name.replace('The ','')[0]}</div><div><div class="who">${n.name} <span class="voice">${n.voice}</span></div><div class="txt"></div></div>`;
+  } else {
+    d.innerHTML = `<div class="av" style="background:#d9cfb8">A</div><div><div class="who" style="justify-content:flex-end">Aria · ${who||'voice'}</div><div class="txt"></div></div>`;
+  }
+  d.querySelector('.txt').textContent = kind === 'player' ? text : '';
+  feed.appendChild(d); scrollFeed(); return d;
+}
+async function tell(segments){
+  speaking = true; cancelSpeech = false; setChoices([]);
+  for (const seg of segments) {
+    if (cancelSpeech) break;
+    if (seg.sys) { sys(seg.sys); await sleep(400); continue; }
+    if (seg.fn) { seg.fn(); await sleep(300); continue; }
+    const el = addLine(seg.who === 'narrator' ? 'narration' : 'npc', '', seg.who);
+    el.classList.add('speaking');
+    const n = seg.who === 'narrator' ? null : NPC[seg.who];
+    setState('speak', `<b>${n ? n.name : st.name}</b> is speaking · voice <b>${n ? n.voice : st.voice}</b>`);
+    const txt = el.querySelector('.txt'), words = seg.text.split(' ');
+    for (let i=0;i<words.length;i++){
+      if (cancelSpeech) { txt.insertAdjacentHTML('beforeend', ' <span class="cut">— (interrupted)</span>'); break; }
+      txt.append((i?' ':'') + words[i]); scrollFeed(); await sleep(70);
+    }
+    el.classList.remove('speaking'); await sleep(250);
+  }
+  speaking = false;
+  if (!listening) setState('idle', '<b>Your turn.</b> Speak, type, or pick an action.');
+}
+
+/* ---------- Story script ---------- */
+const done = new Set();
+function nextChoices(){
+  const all = [
+    ['ledger','Slip the ledger off his desk'],
+    ['writ','Show him the forged writ'],
+    ['choir','Ask about the singing under the docks'],
+  ].filter(([k]) => !done.has(k));
+  if (!all.length) all.push(['steps','Head down to the Drowned Steps']);
+  setChoices(all);
+}
+function setChoices(list){
+  const c = $('#choices'); c.innerHTML = '';
+  list.forEach(([k,label]) => { const b=document.createElement('button'); b.className='chip'; b.textContent=label; b.onclick=()=>act(k,label,'tapped'); c.appendChild(b); });
+  if (list.length) { const o=document.createElement('button'); o.className='chip other'; o.textContent='Something else…'; o.onclick=()=>{ setMode('text'); $('#textIn').focus(); }; c.appendChild(o); }
+}
+async function start(){
+  started = true;
+  feed.innerHTML = `<div class="recap"><h3>Previously in The Salt Lantern</h3><p>You and Mirel escaped the customs cutter and hid the stolen lantern-boat under Lantern Quay. Now you need the harbor ledger, the one that shows who has been paying the Tide Choir.</p></div>`;
+  await tell([
+    { who:'narrator', text:'Rain needles the window of the harbormaster’s office. Venn’s desk is a drift of soggy manifests, and a leather ledger sits at his elbow, its corner stamped with a wave.' },
+    { who:'venn', text:'Port’s closed after dark, girl. State your business or go and get wet somewhere else.' },
+  ]);
+  nextChoices();
+}
+async function act(key, label, how){
+  addLine('player', label, how);
+  if (key === 'ledger') {
+    done.add(key);
+    await tell([{ who:'narrator', text:'You lean on the desk, all apology, letting your cloak fall over the ledger. Give me a Sleight of Hand check.' }]);
+    requestCheck('Sleight of Hand check', 14, 'ledger');
+    setChoices([]); setState('idle','<b>Roll the dice</b> in the side panel, or say “roll it”.');
+    return;
+  }
+  if (key === 'writ') {
+    done.add(key);
+    await tell([
+      { who:'narrator', text:'Venn holds the writ up to the lamp. The wax seal is a little too bright.' },
+      { who:'venn', text:'The Admiralty spells “harbour” with a u, and so does every forger who’s never met one. Sit down. I want to know who sent you.' },
+      { fn:()=>{ NPC.venn.disp='hostile'; ping('npcs'); } },
+      { sys:'<b>Harbormaster Venn</b> is now hostile' },
+    ]);
+    nextChoices(); return;
+  }
+  if (key === 'choir') {
+    done.add(key);
+    await tell([
+      { who:'venn', text:'Singing? Rats in the pilings. Nothing more.' },
+      { who:'narrator', text:'He says it too quickly. And then, beneath the floorboards, you hear it too: many voices, drowned and patient.' },
+      { sys:'Casting a new voice for <b>The Tide Choir</b>: no close match in the library, so a custom voice is being generated: “layered whispering chorus, wet, distant”' },
+      { fn:()=>{ NPC.choir.met=true; ping('npcs'); } },
+      { who:'choir', text:'Little thief. You carry our lantern. Bring it down the steps, and we will tell you who pays us.' },
+      { fn:()=>{ showScene(1); } },
+    ]);
+    nextChoices(); return;
+  }
+  if (key === 'steps') {
+    await tell([{ who:'narrator', text:'The stairs drop into black water, slick with weed. The singing stops all at once, as if the harbor is holding its breath. This is where the mockup ends. In the real game, the story keeps going.' }, { fn:()=>showScene(1) }]);
+    setChoices([]); return;
+  }
+  // free text / voice
+  const k = /ledger|book|steal|grab/i.test(label) ? 'ledger' : /writ|paper|forg/i.test(label) ? 'writ' : /sing|choir|voice|dock|under/i.test(label) ? 'choir' : null;
+  if (k && !done.has(k)) { feed.lastElementChild.remove(); return act(k, label, how); }
+  await tell([{ who:'narrator', text:'Venn watches you with a squint, waiting. The ledger hasn’t moved, and neither has he.' }]);
+  nextChoices();
+}
+
+/* ---------- Voice panel ---------- */
+let mode = 'ptt', listening = false, partialTimer = null;
+const PHRASES = ['I ask him what that singing under the docks is', 'I try to slip the ledger under my cloak', 'I show him the writ from the Admiralty'];
+let phraseI = 0;
+function setState(kind, html){ $('#stateDot').className = 'state-dot ' + (kind==='listen'?'listen':kind==='speak'?'speak':''); $('#stateText').innerHTML = html; }
+function setMode(m){
+  mode = m;
+  document.querySelectorAll('.voice-panel .seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m));
+  $('#voicePanel').classList.toggle('text', m === 'text');
+  $('#modeHint').innerHTML = m==='text' ? 'Text mode: you can still have replies read aloud' : m==='open' ? 'Always listening · a pause ends your turn' : 'Talk while the storyteller speaks to interrupt · <kbd>Space</kbd>';
+  if (m !== 'text' && listening) stopListening(false);
+}
+document.querySelectorAll('.voice-panel .seg button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+function startListening(){
+  if (speaking) { cancelSpeech = true; sys('You interrupted, so the storyteller stopped. The unspoken part of the reply was dropped.'); }
+  listening = true; $('#mic').classList.add('live'); $('#mic').setAttribute('aria-pressed','true'); $('#mic').setAttribute('aria-label','Stop talking');
+  setState('listen', '<b>Listening…</b>' + (mode==='open' ? ' pause to finish' : ' tap again when you’re done'));
+  const avail = PHRASES.filter((p,i) => !done.has(['choir','ledger','writ'][i]));
+  const phrase = avail.length ? avail[phraseI++ % avail.length] : 'I head down to the Drowned Steps';
+  let i = 0; const words = phrase.split(' '); const p = $('#partial');
+  clearInterval(partialTimer);
+  partialTimer = setInterval(() => {
+    i++; p.innerHTML = words.slice(0,i).join(' ') + '<span class="caret"></span>';
+    if (i >= words.length) { clearInterval(partialTimer); if (mode==='open') setTimeout(() => listening && stopListening(true), 700); }
+  }, reduce ? 30 : 180);
+  p.dataset.phrase = phrase;
+}
+function stopListening(send){
+  listening = false; clearInterval(partialTimer);
+  $('#mic').classList.remove('live'); $('#mic').setAttribute('aria-pressed','false'); $('#mic').setAttribute('aria-label','Start talking');
+  const p = $('#partial'), phrase = p.dataset.phrase || '';
+  p.innerHTML = '<span class="muted">What you say appears here as you speak.</span>';
+  if (send && phrase) act(null, phrase.charAt(0).toUpperCase()+phrase.slice(1), 'voice');
+  else setState('idle','<b>Ready.</b>');
+}
+$('#mic').onclick = () => listening ? stopListening(true) : startListening();
+addEventListener('keydown', e => {
+  if (e.code === 'Space' && location.hash === '#table' && mode !== 'text' && !/TEXTAREA|INPUT|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); listening ? stopListening(true) : startListening(); }
+});
+$('#textForm').onsubmit = e => { e.preventDefault(); const v = $('#textIn').value.trim(); if (!v || speaking) return; $('#textIn').value=''; act(null, v, 'typed'); };
+$('#textIn').addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); $('#textForm').requestSubmit(); } });
+
+// waveform
+const wave = $('#wave'); let wctx, t0 = 0;
+function sizeWave(){ wave.width = wave.clientWidth * 2; wave.height = wave.clientHeight * 2; wctx = wave.getContext('2d'); }
+addEventListener('resize', () => { if (location.hash==='#table') sizeWave(); });
+function drawWave(t){
+  if (wctx && wave.width) {
+    const w = wave.width, h = wave.height, n = 64, bw = w / n;
+    wctx.clearRect(0,0,w,h);
+    const amp = listening ? .9 : speaking ? .55 : .06;
+    const col = listening ? '#e07a6e' : getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#d38b4c';
+    for (let i=0;i<n;i++){
+      const v = reduce ? amp*.5 : (Math.sin(i*.42 + t*.006) * .5 + .5) * (Math.sin(i*.13 - t*.0023) * .5 + .5) * amp + .04;
+      const bh = Math.max(3, v * h);
+      wctx.fillStyle = col; wctx.globalAlpha = .35 + v*.65;
+      wctx.fillRect(i*bw + bw*.25, (h-bh)/2, bw*.5, bh);
+    }
+    wctx.globalAlpha = 1;
+  }
+  requestAnimationFrame(drawWave);
+}
+requestAnimationFrame(drawWave);
+
+/* ---------- Scene panel ---------- */
+function renderThumbs(){
+  const th = $('#thumbs'); th.innerHTML = '';
+  SCENES.forEach((sc,i) => {
+    const b = document.createElement('button'); b.setAttribute('aria-label', sc.title); b.setAttribute('aria-current', i===sceneIdx);
+    const cv = document.createElement('canvas'); cv.width = 160; cv.height = 160; b.appendChild(cv); th.appendChild(b);
+    paintScene(cv, sc, st.c); b.onclick = () => showScene(i, true);
+  });
+  const add = document.createElement('button'); add.setAttribute('aria-label','Illustrate this moment'); add.innerHTML='<span class="muted" style="font-size:22px">+</span>'; add.onclick = illustrate; th.appendChild(add);
+}
+async function showScene(i, instant){
+  const sc = $('#scene');
+  if (!instant) { sc.classList.add('loading'); await sleep(1100); }
+  sceneIdx = i; paintScene($('#sceneCanvas'), SCENES[i], st.c);
+  $('#sceneTitle').textContent = SCENES[i].title; $('#sceneSub').textContent = SCENES[i].sub;
+  sc.classList.remove('loading'); renderThumbs();
+}
+async function illustrate(){
+  const s = { title:'This moment', sub:'Generated from the last few lines', seed: Math.floor(Math.random()*1e6), kind: ['room','sea','quay'][Math.floor(Math.random()*3)] };
+  SCENES.push(s); if (SCENES.length > 7) SCENES.splice(3,1);
+  showScene(SCENES.length-1);
+}
+$('#illustrate').onclick = illustrate;
+
+/* ---------- Dice ---------- */
+const DICE = [4,6,8,10,12,20,100]; let die = 20, mod = 5, adv = 'none', pending = null;
+const row = $('#diceRow');
+DICE.forEach(d => { const b=document.createElement('button'); b.textContent='d'+d; b.setAttribute('aria-pressed', d===20); b.onclick=()=>{ die=d; row.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed', x===b)); updRoll(); }; row.appendChild(b); });
+function updRoll(){ $('#modVal').textContent = (mod>=0?'+':'') + mod; $('#rollBtn').textContent = `Roll d${die} ${mod>=0?'+':'−'} ${Math.abs(mod)}${adv!=='none' && die===20 ? (adv==='adv'?' · advantage':' · disadvantage') : ''}`; $('#dieNum').textContent = die; }
+$('#modUp').onclick = () => { mod = Math.min(15, mod+1); updRoll(); };
+$('#modDown').onclick = () => { mod = Math.max(-5, mod-1); updRoll(); };
+document.querySelectorAll('.adv button').forEach(b => b.onclick = () => { adv = b.dataset.adv; document.querySelectorAll('.adv button').forEach(x => x.setAttribute('aria-pressed', x===b)); updRoll(); });
+function requestCheck(title, dc, key){
+  pending = { title, dc, key }; die = 20; mod = 5;
+  row.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.textContent==='d20'));
+  $('#checkTitle').textContent = title; $('#checkDC').textContent = 'DC ' + dc; $('#check').classList.add('on');
+  updRoll(); $('#rollBtn').scrollIntoView({ block:'nearest', behavior: reduce ? 'auto' : 'smooth' });
+}
+$('#rollBtn').onclick = async () => {
+  const stage = $('#dieStage'), btn = $('#rollBtn'); btn.disabled = true;
+  stage.classList.remove('rolling'); void stage.offsetWidth; stage.classList.add('rolling');
+  const spin = setInterval(() => $('#dieNum').textContent = 1 + Math.floor(Math.random()*die), 70);
+  await sleep(900); clearInterval(spin);
+  const r1 = 1 + Math.floor(Math.random()*die), r2 = 1 + Math.floor(Math.random()*die);
+  let nat = r1, note = '';
+  if (die === 20 && adv !== 'none') { nat = adv==='adv' ? Math.max(r1,r2) : Math.min(r1,r2); note = ` (${r1}, ${r2} → ${nat})`; }
+  const total = nat + mod; $('#dieNum').textContent = nat;
+  const T = $('#total'); T.textContent = total; T.className = 'total mono';
+  $('#break').textContent = `d${die}${note || ' → ' + nat} ${mod>=0?'+':'−'} ${Math.abs(mod)}`;
+  let label = pending ? pending.title.replace(' check','') : `d${die}`;
+  if (pending) {
+    const ok = total >= pending.dc || (die===20 && nat===20);
+    T.classList.add(ok ? 'good' : 'bad');
+    $('#verdict').textContent = (die===20 && nat===20) ? 'Natural 20!' : ok ? `Success vs DC ${pending.dc}` : `Fails DC ${pending.dc}`;
+    const key = pending.key; pending = null; $('#check').classList.remove('on');
+    addHistory(label, `d20${mod>=0?'+':''}${mod} → ${total}`);
+    btn.disabled = false;
+    if (key === 'ledger') {
+      addLine('player', `Rolled ${total} for Sleight of Hand`, 'dice');
+      if (ok) {
+        await tell([
+          { who:'narrator', text:'The ledger slides under your cloak as smooth as a wet fish. Venn never looks down.' },
+          { fn:()=>{ addItem('Harbor ledger (wave-stamped)'); } },
+          { sys:'Added <b>Harbor ledger</b> to your inventory · quest updated' },
+        ]);
+      } else {
+        await tell([
+          { who:'narrator', text:'Your elbow catches the inkwell. Black ink spreads across the ledger and Venn’s hand slams down on it.' },
+          { who:'venn', text:'Thief. I knew it the moment you walked in.' },
+          { fn:()=>{ NPC.venn.disp='hostile'; ping('npcs'); hp(-3); } },
+          { sys:'Venn shoves you into the doorframe · <b>−3 HP</b>' },
+        ]);
+      }
+      nextChoices();
+    }
+  } else {
+    $('#verdict').textContent = '';
+    addHistory(`Free roll`, `d${die}${mod>=0?'+':''}${mod} → ${total}`);
+    btn.disabled = false;
+  }
+};
+function addHistory(a,b){ const li=document.createElement('li'); li.innerHTML=`<span>${a}</span><b class="mono">${b}</b>`; const h=$('#history'); h.prepend(li); while(h.children.length>5) h.lastElementChild.remove(); }
+
+/* ---------- Drawer (character / quests / cast / map) ---------- */
+const hero = { hp:24, max:32, inv:['Shortsword','Thieves’ tools','Forged Admiralty writ','Oilcloak'], flash:null };
+let openDrawer = null;
+function bump(){ const r=$('#rev'); r.textContent = +r.textContent + 1; }
+function ping(which){ bump(); $('#dot-'+which).classList.add('on'); if (openDrawer===which) renderDrawer(which, true); }
+function addItem(name){ hero.inv.push(name); hero.flash = name; ping('character'); questDone = true; ping('quests'); }
+function hp(d){ hero.hp = Math.max(0, hero.hp + d); ping('character'); }
+let questDone = false;
+function renderDrawer(which, flash){
+  const B = $('#drawerBody');
+  $('#drawerTitle').textContent = { character:'Aria Nightshade', quests:'Quest log', npcs:'Characters met', map:'Map' }[which];
+  if (which === 'character') {
+    B.innerHTML = `<div class="muted" style="margin-top:-6px">Rogue · Level 3</div>
+      <div class="meter"><div style="display:flex;justify-content:space-between"><span>Hit points</span><span class="mono">${hero.hp} / ${hero.max}</span></div><div class="track"><div class="fill" style="width:${hero.hp/hero.max*100}%;background:var(--good)"></div></div></div>
+      <div class="meter"><div style="display:flex;justify-content:space-between"><span>Luck</span><span class="mono">2 / 3</span></div><div class="track"><div class="fill" style="width:66%;background:var(--accent)"></div></div></div>
+      <div class="stat-grid">${[['DEX',18],['INT',14],['CHA',13],['STR',10],['CON',12],['WIS',11]].map(([k,v])=>`<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('')}</div>
+      <h3 style="font-size:18px">Inventory</h3>
+      <ul class="list">${hero.inv.map(i=>`<li class="${flash&&i===hero.flash?'flash':''}">${i}</li>`).join('')}</ul>`;
+  } else if (which === 'quests') {
+    B.innerHTML = `<ul class="list">
+      <li class="${flash?'flash':''}"><b>The wave-stamped ledger</b><small>Active</small>
+        <div style="margin-top:6px;font-size:13px">${questDone?'☑':'☐'} Steal Venn’s ledger<br>☐ Find out who pays the Tide Choir</div></li>
+      <li><b>Hide the lantern-boat</b><small>Completed · Session 3</small></li>
+      <li><b>A debt to Mirel</b><small>Active · repay her before the Festival of Wicks</small></li></ul>`;
+  } else if (which === 'npcs') {
+    B.innerHTML = `<ul class="list">${Object.entries(NPC).filter(([k,n])=>k!=='choir'||n.met).map(([k,n])=>`
+      <li class="npc-row ${flash?'flash':''}"><span class="av" style="background:${n.c}">${n.name.replace('The ','')[0]}</span>
+        <span class="grow"><b>${n.name}</b> <span class="disp ${n.disp}">${n.disp}</span><small>${n.note}</small><small>Voice: ${n.voice}</small></span>
+        <button class="mini" data-recast="${k}">Recast</button></li>`).join('')}</ul>
+      <p class="muted" style="font-size:13px;margin:0">The storyteller casts a voice for each new character from the voice library. That character keeps the voice for the rest of the campaign.</p>`;
+    B.querySelectorAll('[data-recast]').forEach(b => b.onclick = () => {
+      const n = NPC[b.dataset.recast], opts = ['Weathered Bass','Smoky Contralto','Reedy Tenor','Gravel Baritone','Bright Youth'];
+      n.voice = opts[(opts.indexOf(n.voice)+1) % opts.length]; bump(); renderDrawer('npcs');
+      sys(`Recast <b>${n.name}</b> → voice <b>${n.voice}</b>`);
+    });
+  } else {
+    B.innerHTML = `<ul class="list">
+      <li><b>Harbormaster's Office</b><small>You are here</small></li>
+      <li><b>Lantern Quay</b><small>Discovered · Session 2</small></li>
+      <li><b>The Drowned Steps</b><small>${NPC.choir.met?'Heard of · Session 4':'Not yet discovered'}</small></li>
+      <li><b>Saltmarket</b><small>Discovered · Session 1</small></li></ul>`;
+  }
+}
+document.querySelectorAll('[data-drawer]').forEach(b => b.onclick = () => {
+  const w = b.dataset.drawer, d = $('#drawer');
+  if (openDrawer === w) { closeDrawer(); return; }
+  openDrawer = w; renderDrawer(w); d.classList.add('open'); d.setAttribute('aria-hidden','false');
+  document.querySelectorAll('[data-drawer]').forEach(x => x.setAttribute('aria-expanded', x===b));
+  const dot = $('#dot-'+w); if (dot) dot.classList.remove('on');
+});
+function closeDrawer(){ openDrawer=null; $('#drawer').classList.remove('open'); $('#drawer').setAttribute('aria-hidden','true'); document.querySelectorAll('[data-drawer]').forEach(x=>x.setAttribute('aria-expanded','false')); }
+$('#drawerClose').onclick = closeDrawer;
+addEventListener('keydown', e => { if (e.key==='Escape') closeDrawer(); });
+
+/* ---------- Boot ---------- */
+pick(STORYTELLERS[0]);
+updRoll();
+route();
+})();
+</script>
+</body>
+</html>

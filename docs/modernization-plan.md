@@ -217,6 +217,8 @@ Landing  →  Library (your campaigns / save slots, "Continue" hero card with la
 **Storyteller picker:** a gallery of large portrait cards showing the tagline, style tags, languages and a ▶ **Hear a sample** button (uses `sampleAudioUrl`). Players can preview and switch before starting. Data comes from the `Storyteller` records (§2.4), not code.
 
 ### 4.4 The Story Table: more than audio
+
+Clickable mockup: [`docs/mockups/story-table.html`](mockups/story-table.html) (open it in a browser). It shows the storyteller picker, the voice input panel, and the scene art and dice side panel.
 The play screen is a multi-panel table. The voice session and the screen stay in sync through **LiveKit data-channel events** sent by the agent:
 
 | Panel / feature | What it does | Driven by |
