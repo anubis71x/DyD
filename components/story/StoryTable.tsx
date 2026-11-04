@@ -76,7 +76,7 @@ function Line({ line, save, speaking }: { line: FeedLine; save: SaveFile; speaki
   );
 }
 
-function Feed({ state }: { state: StoryState }) {
+function Feed({ state, send }: { state: StoryState; send: (i: TurnInput) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const last = state.lines[state.lines.length - 1];
   useEffect(() => {
@@ -90,6 +90,23 @@ function Feed({ state }: { state: StoryState }) {
         <div className="max-w-[68ch] rounded-xl border border-white/10 p-4" style={{ background: `linear-gradient(135deg, ${mix(14)}, transparent 60%)` }}>
           <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">Previously in {save.title}</h3>
           <p className="text-sm text-zinc-400">{recap.summary}</p>
+          {save.memory.nextSessionHooks.length > 0 && (
+            <ul className="mt-2 list-disc pl-5 text-sm text-zinc-500">
+              {save.memory.nextSessionHooks.map((h) => (
+                <li key={h}>{h}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {state.sessionEnded && (
+        <div className="flex max-w-[68ch] flex-col items-start gap-3 rounded-xl border border-white/10 bg-[#151a22] p-4">
+          <p className="text-sm text-zinc-400">
+            {recap ? "Session ended and saved to your journal. The recap above opens your next session." : "Session ended. There wasn't enough story yet for a recap."}
+          </p>
+          <button type="button" onClick={() => send({ type: "begin" })} className="rounded-full bg-[color:var(--accent)] px-4 py-2 text-sm font-semibold text-[#14100b] hover:brightness-110">
+            Begin the next session
+          </button>
         </div>
       )}
       {state.lines.map((l) => (
@@ -488,7 +505,7 @@ const RAIL: { key: DrawerKey; label: string; path: string }[] = [
 /* ----------------------------------------------------------------- table */
 
 export function StoryTable({ campaignId }: { campaignId: string }) {
-  const { state, send, setModel, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId);
+  const { state, send, setModel, endSession, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId);
   const [fundsOpen, setFundsOpen] = useState(false);
   const [drawer, setDrawer] = useState<DrawerKey | null>(null);
 
@@ -521,6 +538,17 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
         </div>
         <div className="flex-1" />
         <ModelSelect value={save.modelId ?? DEFAULT_MODEL_ID} onChange={setModel} disabled={state.busy} />
+        {state.sessionNo !== null && !state.sessionEnded && (
+          <button
+            type="button"
+            onClick={() => void endSession()}
+            disabled={state.busy || state.endingSession}
+            title="Write this session to your journal and start fresh next time"
+            className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-400 hover:text-zinc-100 disabled:opacity-50 md:inline"
+          >
+            {state.endingSession ? "Writing recap…" : "End session"}
+          </button>
+        )}
         <span className="hidden rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-xs text-zinc-400 xl:inline">✓ Saved · rev {save.revision}</span>
         <a href={`/api/campaigns/${campaignId}/export`} className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-400 hover:text-zinc-100 md:inline">Download save</a>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-sm">
@@ -572,7 +600,7 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
             )}
           </aside>
 
-          <Feed state={state} />
+          <Feed state={state} send={send} />
 
           {state.error && (
             <div role="alert" className="mx-3 mb-2 flex items-start justify-between gap-3 rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-100 sm:mx-6">

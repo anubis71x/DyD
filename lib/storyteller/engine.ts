@@ -17,6 +17,7 @@ import { checkOutcome, describeRoll, DiceError, parseNotation, roll } from "./di
 import type { TableEvent, TurnInput } from "./events";
 import { getModel, type StorytellerModel } from "./models";
 import { buildSystemPrompt, sessionOpening } from "./prompt";
+import { hasStory, RECAP_MODEL, summarizeSession } from "./recap";
 import { SayParser } from "./sayParser";
 import { getStoryteller } from "./storytellers";
 import { runTool, TOOL_PARAMS } from "./tools";
@@ -24,7 +25,16 @@ import { runTool, TOOL_PARAMS } from "./tools";
 export const ENGINE_CONFIG = {
   maxTokens: 16000,
   maxToolRounds: 8,
+  /** A session idle this long is closed (with a recap) and the next turn starts a new one. */
   sessionIdleMs: 6 * 60 * 60 * 1000,
+  /**
+   * A session whose history passes this many (estimated) tokens is closed with
+   * a recap and continued in a fresh session. Keeps turns fast and every prompt
+   * well under Haiku 5.5's 100K-token price step.
+   */
+  rolloverTokens: 60_000,
+  /** Holds older than this were left by a crashed turn and are released. */
+  staleHoldMs: 15 * 60 * 1000,
 };
 
 /** Request fields that depend on the chosen model. */
@@ -58,12 +68,65 @@ const EMPTY_USAGE: SessionUsage = {
 
 const asMessages = (m: unknown[]) => m as BetaMessageParam[];
 
-async function getOrStartSession(stores: Stores, ownerId: string, campaignId: string, now: Date) {
+/**
+ * End a session: write its recap to the save file (charged like a turn, at
+ * cost + markup) and mark it ended. A failed recap doesn't block anything;
+ * the session still ends.
+ */
+export async function closeSession(
+  ownerId: string,
+  campaignId: string,
+  session: PlaySession,
+  deps: Pick<TurnDeps, "stores" | "client" | "emit">,
+): Promise<void> {
+  const { stores, emit } = deps;
+  const now = new Date().toISOString();
+  if (!session.recappedAt && hasStory(session.messages)) {
+    try {
+      const save = await loadCampaign(stores, ownerId, campaignId);
+      const { event, costLines } = await summarizeSession(deps.client, save, session.sessionNo, session.messages, now);
+      const providerMicros = costLines.reduce((sum, l) => sum + l.micros, 0);
+      const charge = withMarkup(providerMicros);
+      if (charge > 0) {
+        await stores.wallet.post({
+          refId: `recap:${session.sessionId}`,
+          userId: ownerId,
+          amountMicros: -charge,
+          kind: "charge",
+          meta: { campaignId, sessionId: session.sessionId, purpose: "recap", model: RECAP_MODEL, providerMicros, markup: MARKUP, lines: costLines },
+        });
+      }
+      if (event) {
+        await commitEvents(stores, ownerId, campaignId, [event], "system");
+        await stores.sessions.update(ownerId, session.sessionId, { recappedAt: now });
+        emit({ type: "notice", message: `Session ${session.sessionNo} recorded in your journal.` });
+      }
+    } catch (err) {
+      console.error("[recap] failed", err instanceof Anthropic.APIError ? err.status : "", (err as Error).message);
+    }
+  }
+  if (!session.endedAt) await stores.sessions.update(ownerId, session.sessionId, { endedAt: now });
+}
+
+/** End the active session on request (the player chose "End session"). */
+export async function endSession(ownerId: string, campaignId: string, deps: Pick<TurnDeps, "stores" | "client" | "emit">): Promise<boolean> {
+  const latest = await deps.stores.sessions.latest(ownerId, campaignId);
+  if (!latest || latest.endedAt) return false;
+  await closeSession(ownerId, campaignId, latest, deps);
+  return true;
+}
+
+async function getOrStartSession(ownerId: string, campaignId: string, now: Date, deps: TurnDeps) {
+  const { stores } = deps;
   const latest = await stores.sessions.latest(ownerId, campaignId);
-  const fresh =
-    latest && !latest.endedAt && now.getTime() - new Date(latest.lastActiveAt).getTime() < ENGINE_CONFIG.sessionIdleMs;
-  if (latest && fresh) return { session: latest, isNew: false };
-  if (latest && !latest.endedAt) await stores.sessions.update(ownerId, latest.sessionId, { endedAt: now.toISOString() });
+  let continuing = false;
+  if (latest && !latest.endedAt) {
+    const idle = now.getTime() - new Date(latest.lastActiveAt).getTime() >= ENGINE_CONFIG.sessionIdleMs;
+    const tooLong = estimateTokens(JSON.stringify(latest.messages)) > ENGINE_CONFIG.rolloverTokens;
+    if (!idle && !tooLong) return { session: latest, isNew: false, continuing: false };
+    continuing = tooLong && !idle;
+    await closeSession(ownerId, campaignId, latest, deps);
+  }
   const session: PlaySession = {
     sessionId: randomUUID(),
     campaignId,
@@ -74,7 +137,7 @@ async function getOrStartSession(stores: Stores, ownerId: string, campaignId: st
     lastActiveAt: now.toISOString(),
   };
   await stores.sessions.create(session);
-  return { session, isNew: true };
+  return { session, isNew: true, continuing };
 }
 
 /** Check the player's input before any money moves. Returns an error message or null. */
@@ -130,7 +193,11 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
     return;
   }
 
-  const { session, isNew } = await getOrStartSession(stores, ownerId, campaignId, new Date());
+  // Money left in holds by a turn that crashed goes back to the player first.
+  await stores.wallet.releaseStaleHolds(ownerId, ENGINE_CONFIG.staleHoldMs);
+
+  const { session, isNew, continuing } = await getOrStartSession(ownerId, campaignId, new Date(), deps);
+  if (isNew) save = await loadCampaign(stores, ownerId, campaignId); // may now include the last recap
   if (!isNew && input.type === "begin") {
     // "begin" on a session already in progress: nothing to send.
     emit({ type: "done", balanceMicros: await stores.wallet.balance(ownerId), turnCostMicros: 0 });
@@ -138,7 +205,7 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
   }
 
   const messages = asMessages(session.messages);
-  const opening = isNew ? sessionOpening(save, session.sessionNo) : "";
+  const opening = isNew ? sessionOpening(save, session.sessionNo, { continuing }) : "";
 
   // Hold enough for a long turn before anything is sent or rolled.
   const turnId = randomUUID();

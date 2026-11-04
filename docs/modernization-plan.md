@@ -257,7 +257,9 @@ Vapi is removed and voice play is paused. Text play runs on the new stack:
 - **Phase 3:** partly done. Library + storyteller picker at `/dashboard/narrator`, Story Table at `/dashboard/play/[id]` (text input, choices, dice, scene, character/quest/cast/map drawers).
 - Model choice: players pick Haiku 5.5 (default), Sonnet 5.5 or Opus 5.5 per campaign and can switch mid-campaign; coins per turn depend on the model, and sessions log token usage per model.
 - Billing: coins replaced by a prepaid dollar balance. Turns are charged at real API cost + 30% through an append-only ledger (hold, then settle); top-ups ($5 minimum) are credited only by the verified Stripe webhook; $2.50 signup credit; legacy coins convert at $10/60 each. This also fixes the Stripe pre-payment crediting bug.
-- Not yet: session-end recaps (the `memory.recap` event exists, nothing writes it), an image provider, ambience audio, voice.
+- Sessions: recaps written by Claude Haiku 5.5 when a session ends (player's "End session", 6 h idle, or history past ~60K tokens, which keeps prompts under Haiku's 100K price step). The recap records where the scene stopped, so a length rollover continues mid-scene. Recaps are billed like turns.
+- Reliability: one turn per campaign at a time via a database lock (works across server instances); holds left by a crashed turn are released automatically after 15 minutes.
+- Not yet: an image provider, ambience audio, voice, Next/React/Clerk upgrade (Phase 6), legacy route cleanup after migration (Phase 5).
 
 
 | Phase | Scope | Exit criteria |

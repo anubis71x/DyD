@@ -130,6 +130,8 @@ export const SaveFileSchema = z.object({
         date: z.string(),
         summary: longText,
         notableQuotes: z.array(shortText),
+        /** Exactly where the scene stopped, for picking up mid-scene. */
+        leftOff: longText.optional(),
       }),
     ),
     nextSessionHooks: z.array(shortText),
@@ -244,10 +246,12 @@ export const SaveEventSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("memory.recap"),
+    sessionNo: z.number().int().min(1).optional(),
     summary: longText,
     notableQuotes: z.array(shortText),
     nextSessionHooks: z.array(shortText),
     storySoFar: longText,
+    leftOff: longText.optional(),
     date: z.string(),
   }),
 ]);

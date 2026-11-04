@@ -40,6 +40,7 @@ const playSessionSchema = new mongoose.Schema(
     startedAt: { type: Date, required: true },
     lastActiveAt: { type: Date, required: true },
     endedAt: { type: Date },
+    recappedAt: { type: Date },
     usage: { type: mongoose.Schema.Types.Mixed },
   },
   { versionKey: false, minimize: false },
@@ -67,6 +68,14 @@ const ledgerSchema = new mongoose.Schema(
 export const WalletModel = mongoose.models.Wallet || mongoose.model("Wallet", walletSchema);
 export const LedgerModel = mongoose.models.LedgerEntry || mongoose.model("LedgerEntry", ledgerSchema, "ledger");
 
+const lockSchema = new mongoose.Schema(
+  { _id: { type: String, required: true }, token: { type: String, required: true }, expiresAt: { type: Date, required: true } },
+  { versionKey: false },
+);
+// Let MongoDB delete long-expired locks on its own.
+lockSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 3600 });
+const LockModel = mongoose.models.Lock || mongoose.model("Lock", lockSchema);
+
 const isDuplicateKey = (e: unknown) => (e as { code?: number })?.code === 11000;
 
 const CampaignModel = mongoose.models.Campaign || mongoose.model("Campaign", campaignSchema);
@@ -82,6 +91,7 @@ const toSession = (d: Record<string, any>): PlaySession => ({
   startedAt: new Date(d.startedAt).toISOString(),
   lastActiveAt: new Date(d.lastActiveAt).toISOString(),
   ...(d.endedAt ? { endedAt: new Date(d.endedAt).toISOString() } : {}),
+  ...(d.recappedAt ? { recappedAt: new Date(d.recappedAt).toISOString() } : {}),
   ...(d.usage ? { usage: d.usage } : {}),
 });
 
@@ -157,6 +167,7 @@ const mongoStores: Stores = {
       if (patch.lastActiveAt) $set.lastActiveAt = new Date(patch.lastActiveAt);
       if (patch.endedAt) $set.endedAt = new Date(patch.endedAt);
       if (patch.usage) $set.usage = patch.usage;
+      if (patch.recappedAt) $set.recappedAt = new Date(patch.recappedAt);
       await PlaySessionModel.updateOne({ _id: sessionId, ownerId }, { $set });
     },
   },
@@ -192,6 +203,38 @@ const mongoStores: Stores = {
       }
       await WalletModel.updateOne({ _id: entry.userId }, { $inc: { balanceMicros: entry.amountMicros }, $set: { updatedAt: now } }, { upsert: true });
       return "ok";
+    },
+    async releaseStaleHolds(userId, olderThanMs) {
+      const cutoff = new Date(Date.now() - olderThanMs);
+      const holds = await LedgerModel.find({ userId, kind: "hold", createdAt: { $lt: cutoff } }).sort({ createdAt: -1 }).limit(50).lean<{ _id: string; amountMicros: number }[]>();
+      if (!holds.length) return 0;
+      const releaseIds = holds.map((h) => h._id.replace(/:hold$/, ":release"));
+      const released = new Set((await LedgerModel.find({ _id: { $in: releaseIds } }, { _id: 1 }).lean<{ _id: string }[]>()).map((d) => d._id));
+      let n = 0;
+      for (const h of holds) {
+        const refId = h._id.replace(/:hold$/, ":release");
+        if (released.has(refId)) continue;
+        if ((await mongoStores.wallet.post({ refId, userId, amountMicros: -h.amountMicros, kind: "release", meta: { stale: true } })) === "ok") n++;
+      }
+      return n;
+    },
+  },
+  locks: {
+    async acquire(key, ttlMs) {
+      const token = new mongoose.Types.ObjectId().toHexString();
+      const expiresAt = new Date(Date.now() + ttlMs);
+      try {
+        await LockModel.create({ _id: key, token, expiresAt });
+        return token;
+      } catch (e) {
+        if (!isDuplicateKey(e)) throw e;
+      }
+      // Someone holds it; take it over only if it has expired.
+      const res = await LockModel.updateOne({ _id: key, expiresAt: { $lt: new Date() } }, { $set: { token, expiresAt } });
+      return res.modifiedCount === 1 ? token : null;
+    },
+    async release(key, token) {
+      await LockModel.deleteOne({ _id: key, token });
     },
   },
 };

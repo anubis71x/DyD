@@ -45,6 +45,8 @@ Players keep a prepaid dollar balance and pay what each turn actually costs us, 
 - **Ledger:** every grant, top-up, hold, release and charge is a row in the `ledger` collection with a unique reference, so nothing is applied twice. `wallets` holds the current balance as a cache of the ledger.
 - **Top-ups:** $5 minimum (presets $5 / $10 / $20 / $50, up to $500). The balance is credited only by the Stripe webhook after Stripe confirms the payment.
 - **New players** get $2.50 of free credit once.
+- **Recaps** at the end of each session run on Claude Haiku 5.5 and are charged the same way (typically a fraction of a cent).
+- **Safety:** a hold left by a crashed turn is released automatically after 15 minutes.
 
 Setup and operations:
 
@@ -80,6 +82,7 @@ All routes require a signed-in Clerk user, and every read or write is scoped to 
 | `GET /api/campaigns/[id]` | Save file plus the current session's transcript |
 | `PATCH /api/campaigns/[id]` | Switch the storyteller's model `{ modelId }` |
 | `DELETE /api/campaigns/[id]` | Delete a campaign |
+| `POST /api/campaigns/[id]/session/end` | End the current session and write its recap |
 | `POST /api/campaigns/[id]/turn` | Play a turn (`begin`, `text`, `choice` or `roll`); streams table events as server-sent events |
 | `GET /api/campaigns/[id]/export` | Download the `.dydsave` file |
 | `POST /api/campaigns/import` | Upload a `.dydsave` file (raw body) |

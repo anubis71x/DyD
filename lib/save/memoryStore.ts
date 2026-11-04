@@ -8,6 +8,7 @@ export function createMemoryStores(initialBalances: Record<string, number> = {})
   const sessions = new Map<string, PlaySession>();
   const balances = new Map(Object.entries(initialBalances));
   const ledger = new Map<string, LedgerEntry>();
+  const locks = new Map<string, { token: string; expiresAt: number }>();
   const clone = <T,>(x: T): T => structuredClone(x);
 
   const stores: Stores = {
@@ -71,7 +72,30 @@ export function createMemoryStores(initialBalances: Record<string, number> = {})
         balances.set(entry.userId, cur + entry.amountMicros);
         return "ok";
       },
+      async releaseStaleHolds(userId, olderThanMs) {
+        const cutoff = Date.now() - olderThanMs;
+        let n = 0;
+        for (const e of Array.from(ledger.values())) {
+          if (e.userId !== userId || e.kind !== "hold" || new Date(e.createdAt).getTime() > cutoff) continue;
+          const releaseRef = e.refId.replace(/:hold$/, ":release");
+          if (ledger.has(releaseRef)) continue;
+          if ((await stores.wallet.post({ refId: releaseRef, userId, amountMicros: -e.amountMicros, kind: "release", meta: { stale: true } })) === "ok") n++;
+        }
+        return n;
+      },
+    },
+    locks: {
+      async acquire(key, ttlMs) {
+        const cur = locks.get(key);
+        if (cur && cur.expiresAt > Date.now()) return null;
+        const token = Math.random().toString(36).slice(2);
+        locks.set(key, { token, expiresAt: Date.now() + ttlMs });
+        return token;
+      },
+      async release(key, token) {
+        if (locks.get(key)?.token === token) locks.delete(key);
+      },
     },
   };
-  return { stores, _debug: { campaigns, events, sessions, balances, ledger } };
+  return { stores, _debug: { campaigns, events, sessions, balances, ledger, locks } };
 }

@@ -36,6 +36,8 @@ export function saveForPrompt(save: SaveFile): string {
   const { assets, generatedVoices, ownerId, campaignId, revision, createdAt, updatedAt, modelId, ...rest } = save;
   const view = {
     ...rest,
+    // Past recaps are summarized in storySoFar; the latest one is sent separately.
+    memory: { storySoFar: save.memory.storySoFar, nextSessionHooks: save.memory.nextSessionHooks },
     npcs: save.npcs.map(({ portraitAssetId, ...n }) => ({
       ...n,
       voice: voiceLabel(n.voiceId, generatedVoices),
@@ -45,16 +47,26 @@ export function saveForPrompt(save: SaveFile): string {
   return JSON.stringify(view);
 }
 
-export function sessionOpening(save: SaveFile, sessionNo: number): string {
+export function sessionOpening(save: SaveFile, sessionNo: number, opts: { continuing?: boolean } = {}): string {
   const recaps = save.memory.sessionRecaps;
   const last = recaps[recaps.length - 1];
   const isNewCampaign = sessionNo === 1 && !save.character.name;
+  const recapBlock = last
+    ? `\n\n<last_session_recap>\nSummary: ${last.summary}\n${last.leftOff ? `Where it stopped: ${last.leftOff}\n` : ""}${save.memory.nextSessionHooks.length ? `Open threads: ${save.memory.nextSessionHooks.join(" | ")}\n` : ""}</last_session_recap>`
+    : "";
+  if (opts.continuing) {
+    return `<save_file>
+${saveForPrompt(save)}
+</save_file>${recapBlock}
+
+The game is still in progress: the conversation history was just condensed into the recap above to keep the game fast, and the player hasn't left. Don't greet them or recap. Continue from exactly where it stopped: if there is a player message below, respond to it; if not, restate the current moment in a sentence or two and hand the scene back.`;
+  }
   const guidance = isNewCampaign
     ? "This is the very first session of a new campaign and the player has no character yet. Welcome them briefly, then help them create a character through conversation: ask who they want to be, and record the answers with update_character, adjust_resource and change_inventory as they emerge (give a level 1 character sensible attributes and HP for their concept). Ask one or two questions at a time. Once the character is ready, open the first scene."
     : `This is session ${sessionNo}. Open with a brief "previously" in one or two sentences${last ? " based on the last recap" : ""}, then set the scene and hand it to the player.`;
   return `<save_file>
 ${saveForPrompt(save)}
-</save_file>
+</save_file>${recapBlock}
 
 ${guidance}`;
 }

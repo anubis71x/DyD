@@ -36,6 +36,8 @@ export interface PlaySession {
   startedAt: string;
   lastActiveAt: string;
   endedAt?: string;
+  /** Set once the session's recap has been written to the save file. */
+  recappedAt?: string;
   /** API usage per model for this session, to price coins from real numbers. */
   usage?: Record<string, SessionUsage>;
 }
@@ -81,7 +83,7 @@ export interface Stores {
     latest(ownerId: string, campaignId: string): Promise<PlaySession | null>;
     count(ownerId: string, campaignId: string): Promise<number>;
     create(session: PlaySession): Promise<void>;
-    update(ownerId: string, sessionId: string, patch: Partial<Pick<PlaySession, "messages" | "lastActiveAt" | "endedAt" | "usage">>): Promise<void>;
+    update(ownerId: string, sessionId: string, patch: Partial<Pick<PlaySession, "messages" | "lastActiveAt" | "endedAt" | "recappedAt" | "usage">>): Promise<void>;
   };
   wallet: {
     /** Current balance in micro-dollars (0 if the user has no wallet yet). */
@@ -93,6 +95,16 @@ export interface Stores {
      * refused ("insufficient") and not recorded.
      */
     post(entry: LedgerEntryInput): Promise<"ok" | "duplicate" | "insufficient">;
+    /**
+     * Release holds older than `olderThanMs` that were never released (a turn
+     * that crashed between hold and settle). Returns how many were released.
+     */
+    releaseStaleHolds(userId: string, olderThanMs: number): Promise<number>;
+  };
+  locks: {
+    /** Take a named lock for `ttlMs`. Returns a token to release it with, or null if someone else holds it. */
+    acquire(key: string, ttlMs: number): Promise<string | null>;
+    release(key: string, token: string): Promise<void>;
   };
 }
 

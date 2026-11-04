@@ -1,9 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { handle, HttpError, requireUser } from "@/lib/api/http";
 import { getMongoStores } from "@/lib/save/mongoStore";
 import { loadCampaign } from "@/lib/save/service";
+import { campaignLockKey, CAMPAIGN_LOCK_TTL_MS, getClient } from "@/lib/storyteller/client";
 import { runTurn } from "@/lib/storyteller/engine";
 import type { TableEvent, TurnInput } from "@/lib/storyteller/events";
 
@@ -24,14 +24,6 @@ const Input = z.discriminatedUnion("type", [
   }),
 ]);
 
-let client: Anthropic | null = null;
-const getClient = () => (client ??= new Anthropic());
-
-/**
- * One turn per campaign at a time. In-process only: when the app runs on
- * more than one instance, move this to a lock in the database.
- */
-const inFlight = new Set<string>();
 
 export const POST = handle("turn_POST", async (req: NextRequest, { params }: { params: { campaignId: string } }) => {
   const userId = requireUser();
@@ -42,9 +34,10 @@ export const POST = handle("turn_POST", async (req: NextRequest, { params }: { p
   const stores = await getMongoStores();
   await loadCampaign(stores, userId, params.campaignId); // 404 before opening a stream
 
-  const key = `${userId}:${params.campaignId}`;
-  if (inFlight.has(key)) throw new HttpError(409, "The storyteller is still answering your last move.");
-  inFlight.add(key);
+  // One turn per campaign at a time, across all server instances.
+  const key = campaignLockKey(userId, params.campaignId);
+  const lock = await stores.locks.acquire(key, CAMPAIGN_LOCK_TTL_MS);
+  if (!lock) throw new HttpError(409, "The storyteller is still answering your last move.");
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -64,7 +57,7 @@ export const POST = handle("turn_POST", async (req: NextRequest, { params }: { p
         console.error("[turn_POST]", err);
         emit({ type: "error", code: "upstream", message: "Something went wrong. Your progress up to this point is saved." });
       } finally {
-        inFlight.delete(key);
+        await stores.locks.release(key, lock);
         if (open) controller.close();
       }
     },

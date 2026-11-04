@@ -256,9 +256,12 @@ export function applyEvent(save: SaveFile, event: SaveEvent, now: string): SaveF
       break;
 
     case "memory.recap": {
-      const sessionNo = s.memory.sessionRecaps.length + 1;
+      const sessionNo = event.sessionNo ?? s.memory.sessionRecaps.length + 1;
       s.memory.sessionRecaps = tail(
-        [...s.memory.sessionRecaps, { sessionNo, date: event.date, summary: event.summary, notableQuotes: event.notableQuotes }],
+        [
+          ...s.memory.sessionRecaps,
+          { sessionNo, date: event.date, summary: event.summary, notableQuotes: event.notableQuotes, ...(event.leftOff ? { leftOff: event.leftOff } : {}) },
+        ],
         LIMITS.sessionRecaps,
       );
       s.memory.nextSessionHooks = event.nextSessionHooks;

@@ -23,6 +23,9 @@ export interface StoryState {
   save?: SaveFile;
   balanceMicros: number;
   lastTurnCostMicros: number | null;
+  /** The player ended the session; waiting for them to begin the next one. */
+  sessionEnded: boolean;
+  endingSession: boolean;
   sessionNo: number | null;
   lines: FeedLine[];
   busy: boolean;
@@ -130,6 +133,8 @@ const initial: StoryState = {
   status: "loading",
   balanceMicros: 0,
   lastTurnCostMicros: null,
+  sessionEnded: false,
+  endingSession: false,
   sessionNo: null,
   lines: [],
   busy: false,
@@ -173,6 +178,7 @@ export function useStorySession(campaignId: string) {
       setState((s) => ({
         ...s,
         busy: true,
+        sessionEnded: false,
         error: undefined,
         choices: [],
         ...(input.type === "roll" ? { check: undefined } : {}),
@@ -247,6 +253,33 @@ export function useStorySession(campaignId: string) {
     },
     [campaignId],
   );
+  const endSession = useCallback(async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setState((s) => ({ ...s, endingSession: true, error: undefined }));
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}/session/end`, { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setState((s) => ({ ...s, error: { code: "http", message: body.error ?? "Couldn't end the session." } }));
+        return;
+      }
+      setState((s) => ({
+        ...s,
+        save: body.save,
+        balanceMicros: body.balanceMicros,
+        lines: [],
+        choices: [],
+        check: undefined,
+        sessionNo: null,
+        sessionEnded: true,
+      }));
+    } finally {
+      busyRef.current = false;
+      setState((s) => ({ ...s, endingSession: false }));
+    }
+  }, [campaignId]);
+
   /** Re-read the balance (e.g. after a top-up, which the webhook credits a moment later). */
   const refreshBalance = useCallback(async () => {
     const res = await fetch("/api/campaigns", { cache: "no-store" });
@@ -270,5 +303,5 @@ export function useStorySession(campaignId: string) {
     };
   }, [load, send]);
 
-  return { state, send, setModel, refreshBalance, clearChanged, dismissHandout, dismissError };
+  return { state, send, setModel, endSession, refreshBalance, clearChanged, dismissHandout, dismissError };
 }
