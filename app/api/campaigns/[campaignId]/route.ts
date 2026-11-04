@@ -14,7 +14,7 @@ type Ctx = { params: { campaignId: string } };
 export const GET = handle("campaign_GET", async (_req: Request, { params }: Ctx) => {
   const userId = requireUser();
   const stores = await getMongoStores();
-  const [save, session, coins] = await Promise.all([
+  const [save, session, balanceMicros] = await Promise.all([
     loadCampaign(stores, userId, params.campaignId),
     stores.sessions.latest(userId, params.campaignId),
     stores.wallet.balance(userId),
@@ -22,7 +22,7 @@ export const GET = handle("campaign_GET", async (_req: Request, { params }: Ctx)
   const active = session && !session.endedAt ? session : null;
   return NextResponse.json({
     save,
-    coins,
+    balanceMicros,
     sessionNo: active?.sessionNo ?? null,
     transcript: active ? transcriptFromMessages(active.messages) : [],
   });

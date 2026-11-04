@@ -47,7 +47,24 @@ export interface SessionUsage {
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
-  coins: number;
+  providerMicros: number;
+  chargedMicros: number;
+}
+
+export type LedgerKind = "signup_grant" | "topup" | "conversion" | "hold" | "release" | "charge" | "refund" | "adjustment";
+
+export interface LedgerEntryInput {
+  refId: string;
+  userId: string;
+  /** Signed micro-dollars: positive adds to the balance, negative takes from it. */
+  amountMicros: number;
+  kind: LedgerKind;
+  meta?: Record<string, unknown>;
+  requireFunds?: boolean;
+}
+
+export interface LedgerEntry extends Omit<LedgerEntryInput, "requireFunds"> {
+  createdAt: string;
 }
 
 export interface Stores {
@@ -67,10 +84,15 @@ export interface Stores {
     update(ownerId: string, sessionId: string, patch: Partial<Pick<PlaySession, "messages" | "lastActiveAt" | "endedAt" | "usage">>): Promise<void>;
   };
   wallet: {
+    /** Current balance in micro-dollars (0 if the user has no wallet yet). */
     balance(userId: string): Promise<number>;
-    /** Atomically subtract `amount` if the balance covers it. */
-    debit(userId: string, amount: number): Promise<boolean>;
-    credit(userId: string, amount: number): Promise<void>;
+    /**
+     * Record a ledger entry and apply it to the balance. `refId` is unique:
+     * posting the same refId twice returns "duplicate" and changes nothing.
+     * With `requireFunds`, a debit that would take the balance below zero is
+     * refused ("insufficient") and not recorded.
+     */
+    post(entry: LedgerEntryInput): Promise<"ok" | "duplicate" | "insufficient">;
   };
 }
 

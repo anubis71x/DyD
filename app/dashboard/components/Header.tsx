@@ -3,7 +3,8 @@ import { User, ShoppingBasket } from "lucide-react"
 import { UserButton } from "@clerk/nextjs"
 import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query"
 import axios from "axios"
-import { CoinPurchaseButton } from "./coin-purchase-button"
+import { AddFundsButton } from "@/components/billing/AddFunds"
+import { formatUsd } from "@/lib/billing/money"
 import {DashboardIntroModal} from "@/components/intro"
 import { useState, useEffect } from "react"
 
@@ -38,15 +39,15 @@ export function Header() {
 
                 <div className="flex items-center space-x-3 bg-[#16171b] p-3 px-8 rounded-2xl">
                     <div className="px-2">
-                        <CoinPurchaseButton/>
+                        <AddFundsButton onFunded={() => [2000, 5000, 10000].forEach((ms) => setTimeout(() => queryClient.invalidateQueries({ queryKey: ["info"] }), ms))} />
                     </div>
                     <div className="text-gray-400">
                         <div>
                             <h1 className="text-orange-400 text-xl">
-                                {data?.availablePoints}
+                                {data ? formatUsd(data.balanceMicros ?? 0) : "…"}
                             </h1>
                         </div>
-                        <div className="text-sm hidden xl:block">Your coins</div>
+                        <div className="text-sm hidden xl:block">Balance</div>
                     </div>
                     <div className="w-8 h-8 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
                 </div>

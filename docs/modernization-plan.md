@@ -251,11 +251,12 @@ Event contract (agent → client): `{ type: "state.patch" | "ui.choices" | "ui.d
 
 ### Progress (2026-11-04)
 Vapi is removed and voice play is paused. Text play runs on the new stack:
-- **Phase 0:** done, by removal. `/api/vapi/*`, Trieve and the shared dataset are gone; `/api` requires sign-in; coins can no longer be set from the browser. Stripe still credits coins before payment (tracked as a separate task).
+- **Phase 0:** done, by removal. `/api/vapi/*`, Trieve and the shared dataset are gone; `/api` requires sign-in; balances can no longer be set from the browser.
 - **Phase 1:** done. `lib/save/` (schema, reducer, event log, Mongo + in-memory stores, `.dydsave` export/import) and `scripts/migrate-legacy.ts`.
 - **Phase 2:** text half done. `lib/storyteller/` runs Claude with the game tools, `<say>` speaker tags, voice casting from the library and server-side dice. LiveKit, STT and TTS are not started yet.
 - **Phase 3:** partly done. Library + storyteller picker at `/dashboard/narrator`, Story Table at `/dashboard/play/[id]` (text input, choices, dice, scene, character/quest/cast/map drawers).
 - Model choice: players pick Haiku 5.5 (default), Sonnet 5.5 or Opus 5.5 per campaign and can switch mid-campaign; coins per turn depend on the model, and sessions log token usage per model.
+- Billing: coins replaced by a prepaid dollar balance. Turns are charged at real API cost + 30% through an append-only ledger (hold, then settle); top-ups ($5 minimum) are credited only by the verified Stripe webhook; $2.50 signup credit; legacy coins convert at $10/60 each. This also fixes the Stripe pre-payment crediting bug.
 - Not yet: session-end recaps (the `memory.recap` event exists, nothing writes it), an image provider, ambience audio, voice.
 
 

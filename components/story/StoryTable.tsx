@@ -8,7 +8,9 @@ import { DEFAULT_MODEL_ID, getModel } from "@/lib/storyteller/models";
 import { getStoryteller } from "@/lib/storyteller/storytellers";
 import { voiceLabel } from "@/lib/storyteller/voices";
 import type { TurnInput } from "@/lib/storyteller/events";
-import { ModelSelect } from "./ModelPicker";
+import { AddFundsDialog } from "@/components/billing/AddFunds";
+import { formatUsd } from "@/lib/billing/money";
+import { ModelSelect, perTurn } from "./ModelPicker";
 import { AccentScope, Chip, npcColor, Portrait } from "./ui";
 
 const mix = (pct: number) => `color-mix(in srgb, var(--accent) ${pct}%, transparent)`;
@@ -177,7 +179,9 @@ function InputPanel({ state, send }: { state: StoryState; send: (i: TurnInput) =
           <button type="button" disabled className="rounded-full px-3 py-1 text-zinc-600" title="Paused for maintenance">Open mic</button>
           <button type="button" aria-pressed="true" className="rounded-full bg-[#151a22] px-3 py-1 text-zinc-100 ring-1 ring-white/10">Text</button>
         </div>
-        <span className="text-[11px] text-zinc-500">Voice is paused for maintenance · {getModel(state.save!.modelId).coinsPerTurn} coin{getModel(state.save!.modelId).coinsPerTurn === 1 ? "" : "s"} per turn</span>
+        <span className="text-[11px] text-zinc-500">
+          Voice is paused for maintenance · {state.lastTurnCostMicros !== null ? `last turn ${formatUsd(state.lastTurnCostMicros)}` : perTurn(state.save!.modelId)}
+        </span>
       </div>
     </section>
   );
@@ -484,7 +488,8 @@ const RAIL: { key: DrawerKey; label: string; path: string }[] = [
 /* ----------------------------------------------------------------- table */
 
 export function StoryTable({ campaignId }: { campaignId: string }) {
-  const { state, send, setModel, clearChanged, dismissError } = useStorySession(campaignId);
+  const { state, send, setModel, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId);
+  const [fundsOpen, setFundsOpen] = useState(false);
   const [drawer, setDrawer] = useState<DrawerKey | null>(null);
 
   useEffect(() => {
@@ -519,9 +524,14 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
         <span className="hidden rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-xs text-zinc-400 xl:inline">✓ Saved · rev {save.revision}</span>
         <a href={`/api/campaigns/${campaignId}/export`} className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-400 hover:text-zinc-100 md:inline">Download save</a>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-sm">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#e8c060] shadow-[0_0_6px_#e8c06099]" />
-          <span className="font-mono">{state.coins}</span> coins
+          <span className="font-mono">{formatUsd(state.balanceMicros)}</span>
+          <button type="button" onClick={() => setFundsOpen(true)} className="ml-1 rounded-full px-1.5 text-zinc-400 hover:text-zinc-100" aria-label="Add funds">+</button>
         </span>
+        <AddFundsDialog
+          open={fundsOpen}
+          onClose={() => setFundsOpen(false)}
+          onFunded={() => [2000, 5000, 10000].forEach((ms) => setTimeout(() => void refreshBalance(), ms))}
+        />
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[64px_minmax(0,1fr)_360px]">
@@ -568,8 +578,8 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
             <div role="alert" className="mx-3 mb-2 flex items-start justify-between gap-3 rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-100 sm:mx-6">
               <span>
                 {state.error.message}
-                {state.error.code === "out_of_coins" && (
-                  <> <Link href="/dashboard/purchase" className="underline">Get coins</Link></>
+                {state.error.code === "insufficient_funds" && (
+                  <> <button type="button" onClick={() => setFundsOpen(true)} className="underline">Add funds</button></>
                 )}
               </span>
               <button type="button" onClick={dismissError} aria-label="Dismiss" className="text-rose-200/70 hover:text-rose-100">✕</button>

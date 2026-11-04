@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import { connectToDB } from "@/lib/mongoDB";
-import User from "@/lib/models/User";
 import type { SaveFile } from "./schema";
 import { summarize, type PlaySession, type Stores } from "./store";
 
@@ -46,6 +45,29 @@ const playSessionSchema = new mongoose.Schema(
   { versionKey: false, minimize: false },
 );
 playSessionSchema.index({ ownerId: 1, campaignId: 1, sessionNo: -1 });
+
+/* Money. Balances are a cache of the ledger: `scripts/billing.ts reconcile`
+ * recomputes them from ledger entries if a crash ever left them out of step. */
+const walletSchema = new mongoose.Schema(
+  { _id: { type: String, required: true }, balanceMicros: { type: Number, required: true, default: 0 }, updatedAt: { type: Date } },
+  { versionKey: false },
+);
+const ledgerSchema = new mongoose.Schema(
+  {
+    _id: { type: String, required: true }, // refId: unique, makes posting idempotent
+    userId: { type: String, required: true, index: true },
+    amountMicros: { type: Number, required: true },
+    kind: { type: String, required: true },
+    meta: { type: mongoose.Schema.Types.Mixed },
+    createdAt: { type: Date, required: true, index: true },
+  },
+  { versionKey: false, minimize: false },
+);
+
+export const WalletModel = mongoose.models.Wallet || mongoose.model("Wallet", walletSchema);
+export const LedgerModel = mongoose.models.LedgerEntry || mongoose.model("LedgerEntry", ledgerSchema, "ledger");
+
+const isDuplicateKey = (e: unknown) => (e as { code?: number })?.code === 11000;
 
 const CampaignModel = mongoose.models.Campaign || mongoose.model("Campaign", campaignSchema);
 const CampaignEventModel = mongoose.models.CampaignEvent || mongoose.model("CampaignEvent", campaignEventSchema);
@@ -140,18 +162,36 @@ const mongoStores: Stores = {
   },
   wallet: {
     async balance(userId) {
-      const u = await User.findOne({ userId }).lean<{ availablePoints?: number }>();
-      return u?.availablePoints ?? 0;
+      const w = await WalletModel.findById(userId).lean<{ balanceMicros: number }>();
+      return w?.balanceMicros ?? 0;
     },
-    async debit(userId, amount) {
-      const res = await User.updateOne(
-        { userId, availablePoints: { $gte: amount } },
-        { $inc: { availablePoints: -amount }, $set: { updatedAt: new Date() } },
-      );
-      return res.modifiedCount === 1;
-    },
-    async credit(userId, amount) {
-      await User.updateOne({ userId }, { $inc: { availablePoints: amount }, $set: { updatedAt: new Date() } }, { upsert: true });
+    async post({ requireFunds, ...entry }) {
+      const now = new Date();
+      const doc = { _id: entry.refId, userId: entry.userId, amountMicros: entry.amountMicros, kind: entry.kind, meta: entry.meta ?? {}, createdAt: now };
+      if (requireFunds && entry.amountMicros < 0) {
+        // Take the money first, only if it's there, then record why.
+        const res = await WalletModel.updateOne(
+          { _id: entry.userId, balanceMicros: { $gte: -entry.amountMicros } },
+          { $inc: { balanceMicros: entry.amountMicros }, $set: { updatedAt: now } },
+        );
+        if (res.modifiedCount !== 1) return "insufficient";
+        try {
+          await LedgerModel.create(doc);
+        } catch (e) {
+          await WalletModel.updateOne({ _id: entry.userId }, { $inc: { balanceMicros: -entry.amountMicros } });
+          if (isDuplicateKey(e)) return "duplicate";
+          throw e;
+        }
+        return "ok";
+      }
+      try {
+        await LedgerModel.create(doc);
+      } catch (e) {
+        if (isDuplicateKey(e)) return "duplicate";
+        throw e;
+      }
+      await WalletModel.updateOne({ _id: entry.userId }, { $inc: { balanceMicros: entry.amountMicros }, $set: { updatedAt: now } }, { upsert: true });
+      return "ok";
     },
   },
 };

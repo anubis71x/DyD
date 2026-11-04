@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { DEFAULT_MODEL_ID, getModel, MODEL_IDS, type ModelId } from "@/lib/storyteller/models";
 import { STORYTELLERS, type Storyteller } from "@/lib/storyteller/storytellers";
 import { VOICE_BY_ID } from "@/lib/storyteller/voices";
-import { ModelCards } from "./ModelPicker";
+import { ModelCards, perTurn } from "./ModelPicker";
 import { AccentScope, Chip } from "./ui";
 
 function StorytellerCard({ st, selected, onSelect }: { st: Storyteller; selected: boolean; onSelect: () => void }) {
@@ -95,7 +95,7 @@ export function StorytellerPicker({ onStart, busy }: { onStart: (storytellerId: 
         <ModelCards value={modelId} onChange={pickModel} />
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#151a22]/90 p-4">
           <p className="text-sm text-zinc-400">
-            <span className="font-semibold text-zinc-100">{st.name}</span> on {getModel(modelId).name} · {getModel(modelId).coinsPerTurn} coin{getModel(modelId).coinsPerTurn === 1 ? "" : "s"} per turn
+            <span className="font-semibold text-zinc-100">{st.name}</span> on {getModel(modelId).name} · {perTurn(modelId)}
           </p>
           <button
             type="button"

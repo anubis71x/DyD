@@ -29,12 +29,32 @@ Environment (`.env.local`):
 |---|---|
 | `MONGODB_URL` | MongoDB connection string |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | Clerk auth |
-| `STRIPE_SECRET_KEY` | Stripe |
+| `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret of the Stripe webhook endpoint (see Billing) |
 | `ANTHROPIC_API_KEY` | Claude API key for the storyteller |
 
 The old `NEXT_PUBLIC_VAPI_*` and `TRIEVE_*` variables are no longer used and can be deleted.
 
-Players choose the storyteller's model per campaign and can switch during play: Claude Haiku 5.5 (default, 1 coin per turn), Sonnet 5.5 (2) or Opus 5.5 (3). Models, effort levels and coin prices are set in `lib/storyteller/models.ts`. Each play session records token usage per model (`playsessions.usage`), so prices can be checked against real costs.
+Players choose the storyteller's model per campaign and can switch during play: Claude Haiku 5.5 (default), Sonnet 5.5 or Opus 5.5. Models and effort levels are set in `lib/storyteller/models.ts`.
+
+## 💳 Billing
+
+Players keep a prepaid dollar balance and pay what each turn actually costs us, plus a markup.
+
+- **Charging:** after every turn, the API's reported token usage is priced with the rate table in `lib/billing/pricing.ts` (including fallback models and Haiku's long-prompt rates) and charged at cost + 30% (`MARKUP`). Before a turn starts, a worst-case amount is held so a turn can't run on an empty balance; the unused part is released when the turn settles.
+- **Ledger:** every grant, top-up, hold, release and charge is a row in the `ledger` collection with a unique reference, so nothing is applied twice. `wallets` holds the current balance as a cache of the ledger.
+- **Top-ups:** $5 minimum (presets $5 / $10 / $20 / $50, up to $500). The balance is credited only by the Stripe webhook after Stripe confirms the payment.
+- **New players** get $2.50 of free credit once.
+
+Setup and operations:
+
+1. In the Stripe dashboard, add a webhook endpoint for `https://<your-domain>/api/stripe/webhook` with the `payment_intent.succeeded` event, and put its signing secret in `STRIPE_WEBHOOK_SECRET`.
+2. Convert legacy coin balances once (dry run first). Coins convert at the $10 pack price, $10 / 60 ≈ $0.1667 each:
+   ```bash
+   yarn billing:convert-coins
+   yarn billing:convert-coins --apply
+   ```
+3. Monthly: `yarn billing report --month=YYYY-MM` shows top-ups, charges, provider cost and margin per model. Compare the provider cost with the Anthropic Console's usage page; a gap means `pricing.ts` needs new rates. `yarn billing reconcile` checks balances against the ledger (`--fix` corrects them).
 
 Checks: `yarn test` (unit tests), `yarn typecheck`, `yarn lint`.
 
@@ -116,7 +136,7 @@ Track world evolution including locations, factions, events, and time flow.
 ## 🧠 Notes
 - All API endpoints require a Clerk session (`middleware.ts`).
 - The routes listed under "API Endpoints Reference" are the legacy per-session models. They are kept until the migration has run and will then be removed.
-- Coin balances change only on the server. The browser can no longer set them.
+- Balances change only on the server, through the ledger. The browser can't set them.
 
 ---
 

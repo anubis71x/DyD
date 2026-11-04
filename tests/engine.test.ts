@@ -36,8 +36,10 @@ function fakeClient(script: Array<{ content: any[]; stop_reason: string }>) {
   return { client: client as unknown as Anthropic, requests };
 }
 
-async function setup(coins = 5, modelId?: "haiku" | "sonnet" | "opus") {
-  const mem = createMemoryStores({ u: coins });
+const USD = 1_000_000;
+
+async function setup(balanceMicros = 5 * USD, modelId?: "haiku" | "sonnet" | "opus") {
+  const mem = createMemoryStores({ u: balanceMicros });
   const campaign = await createCampaign(mem.stores, "u", { title: "T", storytellerId: "eldrath", ...(modelId ? { modelId } : {}) });
   return { ...mem, campaign };
 }
@@ -69,7 +71,10 @@ describe("runTurn", () => {
     expect(speech.map((s) => s.speaker)).toContain("harbormaster-venn");
     expect(speech.filter((s) => s.speaker === "harbormaster-venn").map((s) => s.text).join("")).toBe("Port's closed.");
     expect(events.some((e) => e.type === "cast")).toBe(true);
-    expect(events.at(-1)).toEqual({ type: "done", coins: 4 });
+    // Two Haiku calls × (100 in × $0.10 + 900 cache reads × $0.01 + 20 out × $0.50) = 58 micro-dollars; +30% → 76.
+    expect(events.at(-1)).toEqual({ type: "done", balanceMicros: 5 * USD - 76, turnCostMicros: 76 });
+    const kinds = Array.from(_debug.ledger.values()).map((e) => [e.kind, e.amountMicros]);
+    expect(kinds).toEqual([["hold", expect.any(Number)], ["release", -kinds[0][1]], ["charge", -76]]);
 
     // Request shape: cached static system prompt, fallbacks on, history grows by appending.
     // Default model is Haiku 5.5, which has no server-side fallback: no fallbacks/betas sent.
@@ -88,12 +93,12 @@ describe("runTurn", () => {
     expect((session.messages[0] as any).content[0].text).toContain("<save_file>");
   });
 
-  it("refuses to play without coins and does not call the model", async () => {
+  it("refuses to play without enough balance for the hold and does not call the model", async () => {
     const { stores, campaign } = await setup(0);
     const { client, requests } = fakeClient([]);
     const events: TableEvent[] = [];
     await runTurn("u", campaign.campaignId, { type: "text", text: "hi" }, { stores, client, emit: (e) => events.push(e) });
-    expect(events).toEqual([{ type: "error", code: "out_of_coins", message: expect.any(String) }]);
+    expect(events).toEqual([{ type: "error", code: "insufficient_funds", message: expect.stringContaining("Add funds") }]);
     expect(requests).toHaveLength(0);
   });
 
@@ -116,32 +121,35 @@ describe("runTurn", () => {
     expect(events.find((e) => e.type === "dice")).toMatchObject({ by: "player", outcome: "success" });
   });
 
-  it("refunds the coin and keeps history valid when the API fails before any output", async () => {
-    const { stores, campaign, _debug } = await setup(2);
+  it("charges nothing and keeps history valid when the API fails before any output", async () => {
+    const { stores, campaign, _debug } = await setup(2 * USD);
     const { APIError } = await import("@anthropic-ai/sdk");
     const client = {
       beta: { messages: { stream() { return { on() { return this; }, async finalMessage() { throw new APIError(529, undefined, "overloaded", undefined); } }; } } },
     } as unknown as Anthropic;
     const events: TableEvent[] = [];
     await runTurn("u", campaign.campaignId, { type: "text", text: "hi" }, { stores, client, emit: (e) => events.push(e) });
-    expect(events.at(-1)).toMatchObject({ type: "error", code: "upstream" });
-    expect(_debug.coins.get("u")).toBe(2);
+    expect(events.find((e) => e.type === "error")).toMatchObject({ code: "upstream", message: expect.stringContaining("weren't charged") });
+    expect(events.at(-1)).toEqual({ type: "done", balanceMicros: 2 * USD, turnCostMicros: 0 });
+    expect(_debug.balances.get("u")).toBe(2 * USD);
+    expect(Array.from(_debug.ledger.values()).some((e) => e.kind === "charge")).toBe(false);
     expect(Array.from(_debug.sessions.values())[0].messages).toEqual([]);
   });
 
   it("uses the campaign's model, its coin price and refusal fallbacks where supported", async () => {
-    const { stores, campaign, _debug } = await setup(5, "opus");
+    const { stores, campaign, _debug } = await setup(5 * USD, "opus");
     const { client, requests } = fakeClient([{ stop_reason: "end_turn", content: [{ type: "text", text: "Hello." }] }]);
     const events: TableEvent[] = [];
     await runTurn("u", campaign.campaignId, { type: "begin" }, { stores, client, emit: (e) => events.push(e) });
     expect(requests[0]).toMatchObject({ model: "claude-opus-5-5", fallbacks: "default", betas: ["server-side-fallback-2026-07-01"] });
-    expect(events.at(-1)).toEqual({ type: "done", coins: 2 });
+    // 100 × $4 + 900 × $0.20 + 20 × $20 = 980 micro-dollars; +30% → 1274.
+    expect(events.at(-1)).toEqual({ type: "done", balanceMicros: 5 * USD - 1274, turnCostMicros: 1274 });
     const session = Array.from(_debug.sessions.values())[0];
-    expect(session.usage?.opus).toEqual({ turns: 1, calls: 1, inputTokens: 100, outputTokens: 20, cacheReadTokens: 900, cacheWriteTokens: 0, coins: 3 });
+    expect(session.usage?.opus).toEqual({ turns: 1, calls: 1, inputTokens: 100, outputTokens: 20, cacheReadTokens: 900, cacheWriteTokens: 0, providerMicros: 980, chargedMicros: 1274 });
   });
 
   it("switching models mid-campaign takes effect on the next turn", async () => {
-    const { stores, campaign } = await setup(10);
+    const { stores, campaign } = await setup(10 * USD);
     const { client, requests } = fakeClient([
       { stop_reason: "end_turn", content: [{ type: "text", text: "One." }] },
       { stop_reason: "end_turn", content: [{ type: "text", text: "Two." }] },
@@ -151,16 +159,17 @@ describe("runTurn", () => {
     await commitEvents(stores, "u", campaign.campaignId, [{ type: "campaign.model", modelId: "sonnet" }], "user");
     await runTurn("u", campaign.campaignId, { type: "text", text: "next" }, deps);
     expect(requests.map((r) => r.model)).toEqual(["claude-haiku-5-5", "claude-sonnet-5-5"]);
-    expect(await stores.wallet.balance("u")).toBe(10 - 1 - 2);
+    // Haiku 29 → 38, then Sonnet (100 × $2 + 900 × $0.10 + 20 × $10 = 490) → 637.
+    expect(await stores.wallet.balance("u")).toBe(10 * USD - 38 - 637);
   });
 
-  it("explains when the balance covers a cheaper model but not this one", async () => {
-    const { stores, campaign } = await setup(2, "opus");
+  it("suggests a cheaper model when the balance can't cover this one", async () => {
+    const { stores, campaign } = await setup(1000, "opus"); // $0.001
     const { client, requests } = fakeClient([]);
     const events: TableEvent[] = [];
     await runTurn("u", campaign.campaignId, { type: "begin" }, { stores, client, emit: (e) => events.push(e) });
     expect(requests).toHaveLength(0);
-    expect(events[0]).toMatchObject({ type: "error", code: "out_of_coins", message: expect.stringContaining("3 coins") });
-    expect(await stores.wallet.balance("u")).toBe(2);
+    expect(events[0]).toMatchObject({ type: "error", code: "insufficient_funds", message: expect.stringContaining("switch to Claude Haiku 5.5") });
+    expect(await stores.wallet.balance("u")).toBe(1000);
   });
 });

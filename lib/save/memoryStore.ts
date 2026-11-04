@@ -1,12 +1,13 @@
 import type { SaveFile } from "./schema";
-import { summarize, type PlaySession, type StoredEvent, type Stores } from "./store";
+import { summarize, type LedgerEntry, type PlaySession, type StoredEvent, type Stores } from "./store";
 
 /** In-memory Stores for tests and local scripts. Not for production. */
-export function createMemoryStores(initialCoins: Record<string, number> = {}) {
+export function createMemoryStores(initialBalances: Record<string, number> = {}) {
   const campaigns = new Map<string, SaveFile>();
   const events: StoredEvent[] = [];
   const sessions = new Map<string, PlaySession>();
-  const coins = new Map(Object.entries(initialCoins));
+  const balances = new Map(Object.entries(initialBalances));
+  const ledger = new Map<string, LedgerEntry>();
   const clone = <T,>(x: T): T => structuredClone(x);
 
   const stores: Stores = {
@@ -60,18 +61,17 @@ export function createMemoryStores(initialCoins: Record<string, number> = {}) {
     },
     wallet: {
       async balance(userId) {
-        return coins.get(userId) ?? 0;
+        return balances.get(userId) ?? 0;
       },
-      async debit(userId, amount) {
-        const cur = coins.get(userId) ?? 0;
-        if (cur < amount) return false;
-        coins.set(userId, cur - amount);
-        return true;
-      },
-      async credit(userId, amount) {
-        coins.set(userId, (coins.get(userId) ?? 0) + amount);
+      async post({ requireFunds, ...entry }) {
+        if (ledger.has(entry.refId)) return "duplicate";
+        const cur = balances.get(entry.userId) ?? 0;
+        if (requireFunds && entry.amountMicros < 0 && cur + entry.amountMicros < 0) return "insufficient";
+        ledger.set(entry.refId, { ...clone(entry), createdAt: new Date().toISOString() });
+        balances.set(entry.userId, cur + entry.amountMicros);
+        return "ok";
       },
     },
   };
-  return { stores, _debug: { campaigns, events, sessions, coins } };
+  return { stores, _debug: { campaigns, events, sessions, balances, ledger } };
 }

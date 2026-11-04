@@ -2,6 +2,20 @@ import { auth } from '@clerk/nextjs';
 import { type NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/mongoDB';
 import User from '@/lib/models/User';
+import { SIGNUP_CREDIT_MICROS } from '@/lib/billing/money';
+import { getMongoStores } from '@/lib/save/mongoStore';
+
+/** Free starting credit, once per user (the refId makes it idempotent). */
+async function grantSignupCredit(userId: string) {
+  const stores = await getMongoStores();
+  await stores.wallet.post({ refId: `signup:${userId}`, userId, amountMicros: SIGNUP_CREDIT_MICROS, kind: 'signup_grant' });
+}
+
+async function withBalance(user: { toObject?: () => object } | object, userId: string) {
+  const stores = await getMongoStores();
+  const base = 'toObject' in user && typeof user.toObject === 'function' ? user.toObject() : user;
+  return { ...base, balanceMicros: await stores.wallet.balance(userId) };
+}
 
 export const GET = async () => {
   try {
@@ -11,13 +25,11 @@ export const GET = async () => {
     await connectToDB();
     let user = await User.findOne({ userId });
 
-    // Si el usuario no existe, se le asignan puntos por primera vez
+    // New user: create the profile and grant the starting credit.
     if (!user) {
       try {
-        user = await User.create({
-          userId,
-          availablePoints: 15
-        });
+        user = await User.create({ userId, availablePoints: 0 });
+        await grantSignupCredit(userId);
       } catch (createError: any) {
         console.log('[user_CREATE]', createError);
 
@@ -34,7 +46,7 @@ export const GET = async () => {
       }
     }
 
-    return NextResponse.json(user, { status: 200 });
+    return NextResponse.json(await withBalance(user, userId), { status: 200 });
   } catch (err) {
     console.log('[user_GET]', err);
     return new NextResponse('Internal Error', { status: 500 });
@@ -51,7 +63,8 @@ export const POST = async (req: NextRequest) => {
     let user = await User.findOne({ userId });
 
     if (!user) {
-      user = await User.create({ userId, availablePoints: 15 });
+      user = await User.create({ userId, availablePoints: 0 });
+      await grantSignupCredit(userId);
     } else {
       return new NextResponse('User already exist', {
         status: 400,

@@ -1,80 +1,26 @@
-'use server';
+"use server";
 
-import User from '@/lib/models/User';
-import { connectToDB } from '@/lib/mongoDB';
-import { auth } from '@clerk/nextjs';
-import Stripe from 'stripe';
+import { auth } from "@clerk/nextjs";
+import { MAX_TOPUP_CENTS, MIN_TOPUP_CENTS } from "@/lib/billing/money";
+import { getStripe } from "@/lib/billing/stripe";
 
-let stripeInstance: Stripe | null = null;
-
-function getStripe() {
-  if (!stripeInstance && process.env.STRIPE_SECRET_KEY) {
-    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2025-02-24.acacia',
-    });
+/**
+ * Start a top-up. This only creates the payment: the balance is credited by
+ * the Stripe webhook (app/api/stripe/webhook) once Stripe confirms the money
+ * arrived, never here.
+ */
+export async function createTopUp(amountCents: number): Promise<{ clientSecret: string }> {
+  const { userId } = auth();
+  if (!userId) throw new Error("Sign in to add funds.");
+  if (!Number.isInteger(amountCents) || amountCents < MIN_TOPUP_CENTS || amountCents > MAX_TOPUP_CENTS) {
+    throw new Error(`Top-ups must be between $${MIN_TOPUP_CENTS / 100} and $${MAX_TOPUP_CENTS / 100}.`);
   }
-
-  if (!stripeInstance) {
-    throw new Error('Stripe API key is not configured');
-  }
-
-  return stripeInstance;
-}
-
-const PACKAGE_PRICES = {
-  '1000_coins': 1000, // $10.00 in cents
-  '2000_coins': 1900, // $19.00 in cents
-  '5000_coins': 5500, // $55.00 in cents
-};
-
-const POINTS_PER_PACKAGE = {
-  '1000_coins': 60,
-  '2000_coins': 120,
-  '5000_coins': 360,
-};
-
-export async function createPaymentIntent(packageId: string) {
-  try {
-    const amount = PACKAGE_PRICES[packageId as keyof typeof PACKAGE_PRICES];
-
-    if (!amount) {
-      throw new Error('Invalid package selected');
-    }
-
-    const stripe = getStripe();
-
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency: 'usd',
-      metadata: {
-        packageId,
-      },
-    });
-
-    if (paymentIntent.client_secret) {
-      const { userId } = auth();
-      if (!userId) throw new Error('Unauthorized');
-
-      await connectToDB();
-      const newPoints = POINTS_PER_PACKAGE[packageId as keyof typeof POINTS_PER_PACKAGE];
-      
-      // Obtener los puntos actuales del usuario
-      const user = await User.findOne({ userId });
-      const currentPoints = user?.availablePoints || 0;
-      
-      // Sumar los puntos nuevos a los existentes
-      const totalPoints = currentPoints + newPoints;
-
-      await User.findOneAndUpdate(
-        { userId },
-        { availablePoints: totalPoints },
-        { new: true, upsert: true }
-      );
-    }
-
-    return { clientSecret: paymentIntent.client_secret };
-  } catch (error) {
-    console.error('Error creating payment intent:', error);
-    throw new Error('Failed to create payment intent');
-  }
+  const intent = await getStripe().paymentIntents.create({
+    amount: amountCents,
+    currency: "usd",
+    description: "Dreampool balance top-up",
+    metadata: { kind: "topup", userId },
+  });
+  if (!intent.client_secret) throw new Error("Couldn't start the payment. Please try again.");
+  return { clientSecret: intent.client_secret };
 }

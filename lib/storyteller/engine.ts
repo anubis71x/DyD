@@ -7,15 +7,17 @@ import type {
   BetaToolResultBlockParam,
   BetaToolUseBlock,
 } from "@anthropic-ai/sdk/resources/beta/messages/messages";
+import { formatUsd } from "@/lib/billing/money";
+import { estimateTokens, holdMicros, MARKUP, responseCost, withMarkup, type CostLine } from "@/lib/billing/pricing";
 import { applyEvents } from "@/lib/save/reducer";
 import type { SaveEvent } from "@/lib/save/schema";
 import { commitEvents, loadCampaign } from "@/lib/save/service";
 import type { PlaySession, SessionUsage, Stores } from "@/lib/save/store";
-import { checkOutcome, describeRoll, DiceError, roll } from "./dice";
+import { checkOutcome, describeRoll, DiceError, parseNotation, roll } from "./dice";
 import type { TableEvent, TurnInput } from "./events";
+import { getModel, type StorytellerModel } from "./models";
 import { buildSystemPrompt, sessionOpening } from "./prompt";
 import { SayParser } from "./sayParser";
-import { getModel, type StorytellerModel } from "./models";
 import { getStoryteller } from "./storytellers";
 import { runTool, TOOL_PARAMS } from "./tools";
 
@@ -35,20 +37,6 @@ export function modelParams(model: StorytellerModel) {
   };
 }
 
-const EMPTY_USAGE: SessionUsage = { turns: 0, calls: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, coins: 0 };
-
-function addUsage(prev: SessionUsage | undefined, u: BetaMessage["usage"]): SessionUsage {
-  const base = prev ?? EMPTY_USAGE;
-  return {
-    ...base,
-    calls: base.calls + 1,
-    inputTokens: base.inputTokens + (u?.input_tokens ?? 0),
-    outputTokens: base.outputTokens + (u?.output_tokens ?? 0),
-    cacheReadTokens: base.cacheReadTokens + (u?.cache_read_input_tokens ?? 0),
-    cacheWriteTokens: base.cacheWriteTokens + (u?.cache_creation_input_tokens ?? 0),
-  };
-}
-
 export interface TurnDeps {
   stores: Stores;
   client: Anthropic;
@@ -56,6 +44,17 @@ export interface TurnDeps {
   rng?: (sides: number) => number;
   signal?: AbortSignal;
 }
+
+const EMPTY_USAGE: SessionUsage = {
+  turns: 0,
+  calls: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  providerMicros: 0,
+  chargedMicros: 0,
+};
 
 const asMessages = (m: unknown[]) => m as BetaMessageParam[];
 
@@ -78,25 +77,32 @@ async function getOrStartSession(stores: Stores, ownerId: string, campaignId: st
   return { session, isNew: true };
 }
 
+/** Check the player's input before any money moves. Returns an error message or null. */
+function validateInput(input: TurnInput): string | null {
+  if (input.type !== "roll") return null;
+  try {
+    parseNotation(input.notation);
+    return null;
+  } catch (e) {
+    if (e instanceof DiceError) return e.message;
+    throw e;
+  }
+}
+
 /** Turn the player's input into message text, rolling dice server-side. */
-function playerContent(input: TurnInput, deps: TurnDeps): { text: string | null; error?: string } {
+function playerContent(input: TurnInput, deps: TurnDeps): string | null {
   switch (input.type) {
     case "begin":
-      return { text: null };
+      return null;
     case "text":
-      return { text: `<player>${input.text.trim().slice(0, 2000)}</player>` };
+      return `<player>${input.text.trim().slice(0, 2000)}</player>`;
     case "choice":
-      return { text: `<player>${input.text.trim().slice(0, 200)}</player>` };
+      return `<player>${input.text.trim().slice(0, 200)}</player>`;
     case "roll": {
-      try {
-        const r = roll(input.notation, input.advantage ?? "none", deps.rng);
-        const outcome = checkOutcome(r, input.dc);
-        deps.emit({ type: "dice", by: "player", label: input.label, roll: r, ...(input.dc !== undefined ? { dc: input.dc } : {}), ...(outcome ? { outcome } : {}) });
-        return { text: `[Dice] ${describeRoll(r, input.label.slice(0, 80), input.dc)}` };
-      } catch (e) {
-        if (e instanceof DiceError) return { text: null, error: e.message };
-        throw e;
-      }
+      const r = roll(input.notation, input.advantage ?? "none", deps.rng);
+      const outcome = checkOutcome(r, input.dc);
+      deps.emit({ type: "dice", by: "player", label: input.label, roll: r, ...(input.dc !== undefined ? { dc: input.dc } : {}), ...(outcome ? { outcome } : {}) });
+      return `[Dice] ${describeRoll(r, input.label.slice(0, 80), input.dc)}`;
     }
   }
 }
@@ -106,51 +112,72 @@ function playerContent(input: TurnInput, deps: TurnDeps): { text: string | null;
  * until the storyteller hands the scene back. Every message is stored as
  * received so the history stays append-only (thinking blocks are only valid
  * in an unedited conversation).
+ *
+ * Billing: before the turn, a worst-case amount is held from the player's
+ * balance. Afterwards the hold is released and the real provider cost of the
+ * calls that completed, plus MARKUP, is charged.
  */
 export async function runTurn(ownerId: string, campaignId: string, input: TurnInput, deps: TurnDeps): Promise<void> {
   const { stores, client, emit } = deps;
   let save = await loadCampaign(stores, ownerId, campaignId);
   const st = getStoryteller(save.storytellerId);
   const model = getModel(save.modelId);
-  const cost = model.coinsPerTurn;
+  const systemPrompt = buildSystemPrompt(st);
 
-  const { text: playerText, error } = playerContent(input, deps);
-  if (error) {
-    emit({ type: "error", code: "invalid_input", message: error });
+  const invalid = validateInput(input);
+  if (invalid) {
+    emit({ type: "error", code: "invalid_input", message: invalid });
     return;
   }
 
   const { session, isNew } = await getOrStartSession(stores, ownerId, campaignId, new Date());
-  if (!isNew && !playerText) {
+  if (!isNew && input.type === "begin") {
     // "begin" on a session already in progress: nothing to send.
-    emit({ type: "done", coins: await stores.wallet.balance(ownerId) });
+    emit({ type: "done", balanceMicros: await stores.wallet.balance(ownerId), turnCostMicros: 0 });
     return;
   }
 
-  if (!(await stores.wallet.debit(ownerId, cost))) {
-    const msg = cost > 1
-      ? `A turn with ${model.name} costs ${cost} coins and you don't have enough. Add coins or switch to a lighter model.`
-      : "You're out of coins. Add more to keep playing.";
-    emit({ type: "error", code: "out_of_coins", message: msg });
+  const messages = asMessages(session.messages);
+  const opening = isNew ? sessionOpening(save, session.sessionNo) : "";
+
+  // Hold enough for a long turn before anything is sent or rolled.
+  const turnId = randomUUID();
+  const promptTokens = estimateTokens(systemPrompt + JSON.stringify(TOOL_PARAMS) + JSON.stringify(messages) + opening) + 600;
+  const hold = holdMicros(model.apiModel, promptTokens);
+  const held = await stores.wallet.post({
+    refId: `turn:${turnId}:hold`,
+    userId: ownerId,
+    amountMicros: -hold,
+    kind: "hold",
+    requireFunds: true,
+    meta: { campaignId, model: model.apiModel },
+  });
+  if (held !== "ok") {
+    const balance = await stores.wallet.balance(ownerId);
+    const cheaper = model.id !== "haiku" ? " or switch to Claude Haiku 5.5" : "";
+    emit({
+      type: "error",
+      code: "insufficient_funds",
+      message: `A turn on ${model.name} needs ${formatUsd(hold)} available and your balance is ${formatUsd(balance)}. Add funds${cheaper} to keep playing. You're only charged what the turn actually costs.`,
+    });
     return;
   }
-  emit({ type: "turn.start", sessionNo: session.sessionNo });
 
   const content: BetaContentBlockParam[] = [];
-  if (isNew) content.push({ type: "text", text: sessionOpening(save, session.sessionNo) });
+  if (opening) content.push({ type: "text", text: opening });
+  const playerText = playerContent(input, deps);
   if (playerText) content.push({ type: "text", text: playerText });
-  const messages = asMessages(session.messages);
   messages.push({ role: "user", content });
+  emit({ type: "turn.start", sessionNo: session.sessionNo });
 
-  // Per-model running totals for this session (real cost data for pricing coins).
+  // Cost of every completed API call this turn.
+  const costLines: CostLine[] = [];
   const usage = { ...(session.usage ?? {}) };
-  const prev = usage[model.id] ?? EMPTY_USAGE;
-  usage[model.id] = { ...prev, turns: prev.turns + 1, coins: prev.coins + cost };
-
   const persist = () =>
     stores.sessions.update(ownerId, session.sessionId, { messages, usage, lastActiveAt: new Date().toISOString() });
 
   let produced = false;
+  let failure: unknown = null;
   try {
     for (let round = 0; round < ENGINE_CONFIG.maxToolRounds; round++) {
       const parser = new SayParser();
@@ -162,7 +189,7 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
         {
           ...modelParams(model),
           max_tokens: ENGINE_CONFIG.maxTokens,
-          system: [{ type: "text", text: buildSystemPrompt(st), cache_control: { type: "ephemeral" } }],
+          system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
           tools: TOOL_PARAMS,
           messages,
           cache_control: { type: "ephemeral" },
@@ -185,8 +212,17 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
       forward(parser.flush());
       emit({ type: "speech.end" });
 
+      costLines.push(...responseCost(model.apiModel, message.usage));
+      const u = usage[model.id] ?? EMPTY_USAGE;
+      usage[model.id] = {
+        ...u,
+        calls: u.calls + 1,
+        inputTokens: u.inputTokens + message.usage.input_tokens,
+        outputTokens: u.outputTokens + message.usage.output_tokens,
+        cacheReadTokens: u.cacheReadTokens + (message.usage.cache_read_input_tokens ?? 0),
+        cacheWriteTokens: u.cacheWriteTokens + (message.usage.cache_creation_input_tokens ?? 0),
+      };
       messages.push({ role: "assistant", content: message.content });
-      usage[model.id] = addUsage(usage[model.id], message.usage);
       await persist();
       produced = true;
 
@@ -238,23 +274,53 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
       if (yieldToPlayer) break;
     }
   } catch (err) {
-    if (!produced) {
-      await stores.wallet.credit(ownerId, cost);
-      const u = usage[model.id];
-      usage[model.id] = { ...u, turns: u.turns - 1, coins: u.coins - cost };
-    }
+    failure = err;
     // Keep the stored history valid: drop a trailing user message the model never answered.
-    if (!produced && messages[messages.length - 1]?.role === "user") {
-      messages.pop();
-    }
-    await persist();
-    if (err instanceof Anthropic.APIError || (err as Error)?.name === "AbortError") {
-      emit({ type: "error", code: "upstream", message: produced ? "The storyteller stopped partway. What was said is saved." : "The storyteller is unavailable right now. Your coins were refunded." });
-      console.error("[storyteller] API error", err instanceof Anthropic.APIError ? err.status : "", (err as Error).message);
-      return;
-    }
-    throw err;
+    if (!produced && messages[messages.length - 1]?.role === "user") messages.pop();
   }
 
-  emit({ type: "done", coins: await stores.wallet.balance(ownerId) });
+  // Settle: release the hold, charge what the completed calls cost plus markup.
+  const providerMicros = costLines.reduce((sum, l) => sum + l.micros, 0);
+  const charge = withMarkup(providerMicros);
+  await stores.wallet.post({ refId: `turn:${turnId}:release`, userId: ownerId, amountMicros: hold, kind: "release", meta: { campaignId } });
+  if (charge > 0) {
+    await stores.wallet.post({
+      refId: `turn:${turnId}:charge`,
+      userId: ownerId,
+      amountMicros: -charge,
+      kind: "charge",
+      meta: {
+        campaignId,
+        sessionId: session.sessionId,
+        model: model.apiModel,
+        providerMicros,
+        markup: MARKUP,
+        lines: costLines,
+      },
+    });
+  }
+  const u = usage[model.id] ?? EMPTY_USAGE;
+  usage[model.id] = {
+    ...u,
+    turns: u.turns + (costLines.length ? 1 : 0),
+    providerMicros: u.providerMicros + providerMicros,
+    chargedMicros: u.chargedMicros + charge,
+  };
+  await persist();
+
+  if (failure) {
+    const err = failure as Error;
+    if (err instanceof Anthropic.APIError || err?.name === "AbortError") {
+      emit({
+        type: "error",
+        code: "upstream",
+        message: produced ? "The storyteller stopped partway. What was said is saved." : "The storyteller is unavailable right now. You weren't charged.",
+      });
+      console.error("[storyteller] API error", err instanceof Anthropic.APIError ? err.status : "", err.message);
+    } else {
+      throw failure;
+    }
+  }
+
+  emit({ type: "done", balanceMicros: await stores.wallet.balance(ownerId), turnCostMicros: charge });
 }

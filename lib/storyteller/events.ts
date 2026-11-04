@@ -18,8 +18,9 @@ export type TableEvent =
   | { type: "ambience"; mood: string }
   | { type: "cast"; npcId: string; voiceId: string; label: string; generated: boolean }
   | { type: "notice"; message: string }
-  | { type: "error"; code: "out_of_coins" | "refused" | "upstream" | "invalid_input" | "not_found"; message: string }
-  | { type: "done"; coins: number };
+  | { type: "error"; code: "insufficient_funds" | "refused" | "upstream" | "invalid_input" | "not_found"; message: string }
+  /** Balance after the turn settled, and what the turn cost the player (micro-dollars). */
+  | { type: "done"; balanceMicros: number; turnCostMicros: number };
 
 /** What the player can send for a turn. */
 export type TurnInput =

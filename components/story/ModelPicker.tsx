@@ -1,14 +1,17 @@
 "use client";
 
-import { MODELS, type ModelId } from "@/lib/storyteller/models";
+import { formatUsd } from "@/lib/billing/money";
+import { typicalTurnMicros } from "@/lib/billing/pricing";
+import { getModel, MODELS, type ModelId } from "@/lib/storyteller/models";
 
-const coins = (n: number) => `${n} coin${n === 1 ? "" : "s"} per turn`;
+/** e.g. "about $0.0008 per turn" */
+export const perTurn = (id: ModelId | undefined) => `about ${formatUsd(typicalTurnMicros(getModel(id).apiModel))} per turn`;
 
 /** Radio cards for choosing the storyteller's model when starting a campaign. */
 export function ModelCards({ value, onChange }: { value: ModelId; onChange: (id: ModelId) => void }) {
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="mb-2 text-sm text-zinc-400">Storyteller model. You can switch at any time during play.</legend>
+      <legend className="mb-2 text-sm text-zinc-400">Storyteller model. You can switch at any time during play. You pay what each turn actually costs; these are typical amounts.</legend>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
         {MODELS.map((m) => {
           const selected = m.id === value;
@@ -25,7 +28,7 @@ export function ModelCards({ value, onChange }: { value: ModelId; onChange: (id:
                 {m.id === "haiku" && <span className="ml-auto text-[11px] text-zinc-500">Default</span>}
               </span>
               <span className="text-sm text-zinc-400">{m.tagline}</span>
-              <span className="font-mono text-xs text-zinc-500">{coins(m.coinsPerTurn)}</span>
+              <span className="font-mono text-xs text-zinc-500">{perTurn(m.id)}</span>
             </label>
           );
         })}
@@ -47,7 +50,7 @@ export function ModelSelect({ value, onChange, disabled }: { value: ModelId; onC
       >
         {MODELS.map((m) => (
           <option key={m.id} value={m.id}>
-            {m.name.replace("Claude ", "")} · {coins(m.coinsPerTurn)}
+            {m.name.replace("Claude ", "")} · {perTurn(m.id)}
           </option>
         ))}
       </select>

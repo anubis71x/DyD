@@ -13,8 +13,8 @@ const MAX_CAMPAIGNS = 20;
 export const GET = handle("campaigns_GET", async () => {
   const userId = requireUser();
   const stores = await getMongoStores();
-  const [campaigns, coins] = await Promise.all([stores.campaigns.list(userId), stores.wallet.balance(userId)]);
-  return NextResponse.json({ campaigns, coins });
+  const [campaigns, balanceMicros] = await Promise.all([stores.campaigns.list(userId), stores.wallet.balance(userId)]);
+  return NextResponse.json({ campaigns, balanceMicros });
 });
 
 const CreateBody = z.object({

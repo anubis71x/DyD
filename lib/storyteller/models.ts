@@ -1,11 +1,6 @@
 /**
  * Models a player can choose for their storyteller. Client-safe.
- *
- * `coinsPerTurn` is what a player pays for one storyteller turn on that
- * model. Rough API cost per text turn (two model calls of ~15K input tokens,
- * mostly cached, and ~600 output tokens each): Haiku ≈ $0.002,
- * Sonnet ≈ $0.03, Opus ≈ $0.06. The session usage log records real numbers
- * (see PlaySession.usage) so these prices can be tuned.
+ * Players pay what each turn actually costs plus a markup (lib/billing).
  */
 
 export type ModelId = "haiku" | "sonnet" | "opus";
@@ -16,7 +11,6 @@ export interface StorytellerModel {
   apiModel: string;
   name: string;
   tagline: string;
-  coinsPerTurn: number;
   effort: Effort;
   /** Server-side refusal fallback (`fallbacks: "default"`). Not available on Haiku 5.5. */
   serverFallback: boolean;
@@ -28,7 +22,6 @@ export const MODELS: StorytellerModel[] = [
     apiModel: "claude-haiku-5-5",
     name: "Claude Haiku 5.5",
     tagline: "Fastest replies. Great for everyday play.",
-    coinsPerTurn: 1,
     // Haiku's default. Cheap enough that the extra care is worth it for bookkeeping.
     effort: "medium",
     serverFallback: false,
@@ -38,7 +31,6 @@ export const MODELS: StorytellerModel[] = [
     apiModel: "claude-sonnet-5-5",
     name: "Claude Sonnet 5.5",
     tagline: "Richer scenes and sharper characters.",
-    coinsPerTurn: 2,
     effort: "low",
     serverFallback: true,
   },
@@ -47,7 +39,6 @@ export const MODELS: StorytellerModel[] = [
     apiModel: "claude-opus-5-5",
     name: "Claude Opus 5.5",
     tagline: "The most thoughtful storyteller. Slower.",
-    coinsPerTurn: 3,
     effort: "low",
     serverFallback: true,
   },

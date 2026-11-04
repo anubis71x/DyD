@@ -21,7 +21,8 @@ export interface StoryState {
   status: "loading" | "ready" | "error";
   loadError?: string;
   save?: SaveFile;
-  coins: number;
+  balanceMicros: number;
+  lastTurnCostMicros: number | null;
   sessionNo: number | null;
   lines: FeedLine[];
   busy: boolean;
@@ -121,13 +122,14 @@ export function reduceEvent(s: StoryState, e: TableEvent): StoryState {
     case "error":
       return { ...s, error: { code: e.code, message: e.message } };
     case "done":
-      return { ...s, coins: e.coins };
+      return { ...s, balanceMicros: e.balanceMicros, lastTurnCostMicros: e.turnCostMicros };
   }
 }
 
 const initial: StoryState = {
   status: "loading",
-  coins: 0,
+  balanceMicros: 0,
+  lastTurnCostMicros: null,
   sessionNo: null,
   lines: [],
   busy: false,
@@ -148,13 +150,13 @@ export function useStorySession(campaignId: string) {
       setState((s) => ({ ...s, status: "error", loadError: msg }));
       return null;
     }
-    const data = (await res.json()) as { save: SaveFile; coins: number; sessionNo: number | null; transcript: TranscriptLine[] };
+    const data = (await res.json()) as { save: SaveFile; balanceMicros: number; sessionNo: number | null; transcript: TranscriptLine[] };
     const lastImage = [...data.save.assets].reverse().find((a) => a.kind === "image");
     setState((s) => ({
       ...s,
       status: "ready",
       save: data.save,
-      coins: data.coins,
+      balanceMicros: data.balanceMicros,
       sessionNo: data.sessionNo,
       lines: data.transcript.map((l) => ({ ...l, id: nextId++ })),
       ...(lastImage ? { scene: { asset: lastImage, status: lastImage.url ? "ready" : "unavailable" } } : {}),
@@ -245,6 +247,14 @@ export function useStorySession(campaignId: string) {
     },
     [campaignId],
   );
+  /** Re-read the balance (e.g. after a top-up, which the webhook credits a moment later). */
+  const refreshBalance = useCallback(async () => {
+    const res = await fetch("/api/campaigns", { cache: "no-store" });
+    if (res.ok) {
+      const { balanceMicros } = await res.json();
+      setState((s) => ({ ...s, balanceMicros, error: s.error?.code === "insufficient_funds" ? undefined : s.error }));
+    }
+  }, []);
   const dismissHandout = useCallback(() => setState((s) => ({ ...s, handout: undefined })), []);
   const dismissError = useCallback(() => setState((s) => ({ ...s, error: undefined })), []);
 
@@ -260,5 +270,5 @@ export function useStorySession(campaignId: string) {
     };
   }, [load, send]);
 
-  return { state, send, setModel, clearChanged, dismissHandout, dismissError };
+  return { state, send, setModel, refreshBalance, clearChanged, dismissHandout, dismissError };
 }
