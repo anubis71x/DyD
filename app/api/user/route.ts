@@ -47,12 +47,11 @@ export const POST = async (req: NextRequest) => {
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
     await connectToDB();
-    const { availablePoints } = await req.json();
-
+    // New accounts always start with the standard grant (same as GET).
     let user = await User.findOne({ userId });
 
     if (!user) {
-      user = await User.create({ userId, availablePoints});
+      user = await User.create({ userId, availablePoints: 15 });
     } else {
       return new NextResponse('User already exist', {
         status: 400,
@@ -66,30 +65,29 @@ export const POST = async (req: NextRequest) => {
   }
 };
 
+// Coin balances change only on the server (turn debits, purchases), never
+// from the browser. This route only updates profile flags.
 export const PUT = async (req: NextRequest) => {
   try {
     const { userId } = auth();
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
     await connectToDB();
-    const { availablePoints, isNewUser } = await req.json();
+    const { isNewUser } = await req.json();
 
-    if (availablePoints === undefined && isNewUser === undefined) {
+    if (typeof isNewUser !== 'boolean') {
       return new NextResponse('Missing data to update', { status: 400 });
     }
 
     const updatedUser = await User.findOneAndUpdate(
       { userId },
-      {
-        ...(availablePoints !== undefined && { availablePoints }),
-        ...(isNewUser !== undefined && { isNewUser }),
-      },
+      { isNewUser },
       { new: true, upsert: true }
     );
 
     return NextResponse.json(updatedUser, { status: 200 });
   } catch (err) {
-    console.log('[userpoints_PUT]', err);
+    console.log('[user_PUT]', err);
     return new NextResponse('Internal Error', { status: 500 });
   }
 };

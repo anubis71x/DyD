@@ -18,13 +18,10 @@ const nextConfig = {
       }
     ],
   },
-  async rewrites() {  // 🔄 Agrega esto para que las rutas API funcionen
-    return [
-      {
-        source: '/api/vapi/:path*',
-        destination: '/api/vapi/:path*',
-      },
-    ];
+  experimental: {
+    // Load the Anthropic SDK from node_modules instead of bundling it: the
+    // Next 14.1 minifier mangles one of its regular expressions.
+    serverComponentsExternalPackages: ["@anthropic-ai/sdk"],
   },
 };
 

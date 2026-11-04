@@ -249,6 +249,15 @@ Event contract (agent → client): `{ type: "state.patch" | "ui.choices" | "ui.d
 
 ## 6. Phased rollout
 
+### Progress (2026-11-04)
+Vapi is removed and voice play is paused. Text play runs on the new stack:
+- **Phase 0:** done, by removal. `/api/vapi/*`, Trieve and the shared dataset are gone; `/api` requires sign-in; coins can no longer be set from the browser. Stripe still credits coins before payment (tracked as a separate task).
+- **Phase 1:** done. `lib/save/` (schema, reducer, event log, Mongo + in-memory stores, `.dydsave` export/import) and `scripts/migrate-legacy.ts`.
+- **Phase 2:** text half done. `lib/storyteller/` runs Claude with the game tools, `<say>` speaker tags, voice casting from the library and server-side dice. LiveKit, STT and TTS are not started yet.
+- **Phase 3:** partly done. Library + storyteller picker at `/dashboard/narrator`, Story Table at `/dashboard/play/[id]` (text input, choices, dice, scene, character/quest/cast/map drawers).
+- Not yet: session-end recaps (the `memory.recap` event exists, nothing writes it), an image provider, ambience audio, voice.
+
+
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **0. Hotfixes** (can ship now on the Vapi stack) | Lock down `/api/vapi/*` with a shared secret header; fix `sessionData` owner filter; server-side coin debit; split Trieve datasets per user or disable KB import | No cross-user reads/writes possible |

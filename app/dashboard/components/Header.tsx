@@ -18,7 +18,6 @@ export function Header() {
         },
         refetchInterval: 10000, // Refetch cada 10 segundos (10000 ms)
     })
-    console.log(data)
     useEffect(() => {
         if (data) {
             setIsOpen(data.isNewUser)
@@ -47,7 +46,7 @@ export function Header() {
                                 {data?.availablePoints}
                             </h1>
                         </div>
-                        <div className="text-sm hidden xl:block">Your Minutes</div>
+                        <div className="text-sm hidden xl:block">Your coins</div>
                     </div>
                     <div className="w-8 h-8 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
                 </div>

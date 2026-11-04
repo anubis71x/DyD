@@ -2,7 +2,9 @@
 
 ## ✨ Overview
 
-DyD is a modern web platform to manage Dungeons & Dragons (D&D) campaigns and other roleplaying sessions. It allows players and Game Masters to track characters, mechanics, quests, NPCs, preferences, and world states, while integrating AI support via Vapi and generating session reports in PDF.
+DyD (Dreampool) is a solo tabletop roleplaying app. The player picks a storyteller, and an AI storyteller runs the game: it narrates, voices the characters, rolls dice and keeps a structured save file of the character, quests, characters met and the world.
+
+> **Status:** Vapi has been removed. Voice play is paused for maintenance while the new voice pipeline is built (see `docs/modernization-plan.md`). Every campaign can be played by text in the meantime.
 
 Access the platform at: **[https://www.dreampool.ai/](https://www.dreampool.ai/)**
 
@@ -10,13 +12,61 @@ Access the platform at: **[https://www.dreampool.ai/](https://www.dreampool.ai/)
 - **Framework:** Next.js (API Routes)
 - **Database:** MongoDB + Mongoose
 - **Authentication:** Clerk
-- **AI Integration:** Vapi AI (via tool calls)
-- **PDF Generation & Storage:** pdf-lib + Trieve
+- **Storyteller:** Claude via the Anthropic SDK (`lib/storyteller/`), with server-side game tools
+- **Save files:** one versioned JSON document per campaign plus an event log (`lib/save/`), portable as `.dydsave`
 - **Payments:** Stripe
+
+## 🛠 Running locally
+
+```bash
+yarn install
+yarn dev
+```
+
+Environment (`.env.local`):
+
+| Variable | Purpose |
+|---|---|
+| `MONGODB_URL` | MongoDB connection string |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | Clerk auth |
+| `STRIPE_SECRET_KEY` | Stripe |
+| `ANTHROPIC_API_KEY` | Claude API key for the storyteller |
+| `STORYTELLER_MODEL` | Optional. Defaults to `claude-opus-5-5` |
+| `STORYTELLER_EFFORT` | Optional. `low` (default) to `max`; higher is slower but more thorough |
+| `COINS_PER_TURN` | Optional. Coins charged per storyteller turn, default `1` |
+
+The old `NEXT_PUBLIC_VAPI_*` and `TRIEVE_*` variables are no longer used and can be deleted.
+
+Checks: `yarn test` (unit tests), `yarn typecheck`, `yarn lint`.
+
+### Migrating legacy sessions
+
+Old campaigns live in six per-session collections. Convert them into save files once:
+
+```bash
+yarn migrate:legacy          # dry run
+yarn migrate:legacy --apply  # write campaigns
+```
+
+It is safe to re-run: converted sessions are marked and skipped. Legacy collections are left in place until you delete them.
+
+## 🎲 Storyteller API
+
+All routes require a signed-in Clerk user, and every read or write is scoped to that user.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/campaigns` | List your campaigns and coin balance |
+| `POST /api/campaigns` | Start a campaign `{ storytellerId }` |
+| `GET /api/campaigns/[id]` | Save file plus the current session's transcript |
+| `DELETE /api/campaigns/[id]` | Delete a campaign |
+| `POST /api/campaigns/[id]/turn` | Play a turn (`begin`, `text`, `choice` or `roll`); streams table events as server-sent events |
+| `GET /api/campaigns/[id]/export` | Download the `.dydsave` file |
+| `POST /api/campaigns/import` | Upload a `.dydsave` file (raw body) |
 
 ---
 
-## 📡 API Endpoints Reference
+## 📡 API Endpoints Reference (legacy)
 All routes require authentication (`Clerk userId`) unless stated otherwise. All data is sent and received in JSON format.
 
 ### `/api/characters`
@@ -46,7 +96,7 @@ Track quest status, goals, NPCs, and narrative objectives.
 ### `/api/search/[query]`
 Fuzzy search over product titles, tags, and categories.
 
-### `/api/sessionData` & `/api/sessions`
+### `/api/sessions`
 Full session lifecycle management with aggregate data access.
 
 ### `/api/stripe`
@@ -63,40 +113,10 @@ Track world evolution including locations, factions, events, and time flow.
 
 ---
 
-## 🔊 Voice Agent Integration (`/api/vapi/...`)
-These endpoints are used exclusively by the voice agent (Vapi) through tool calls.
-
-### `/api/vapi/campaignName`
-Update the campaign name for a given session.
-
-### `/api/vapi/character`
-Create or update character information (name, class, abilities, equipment, etc.).
-
-### `/api/vapi/mechanicsTraking`
-Record or modify mechanical gameplay data like combat or rules.
-
-### `/api/vapi/npcsRelations`
-Add or edit NPCs and their relation state.
-
-### `/api/vapi/pdfData`
-Generate a session report PDF and update the linked Vapi Knowledge Base via Trieve.
-
-### `/api/vapi/playerPreferences`
-Set or enhance narrative preferences like tone, pace, or boundaries.
-
-### `/api/vapi/quest`
-Append or revise quests in the current session.
-
-### `/api/vapi/worldState`
-Track changes to locations, factions, environment, and time.
-
----
-
 ## 🧠 Notes
-- All endpoints are protected by Clerk.
-- MongoDB models are indexed by `userId` or `sessionId`.
-- Session data integrates with Vapi AI via tool-based webhooks.
-- Reports are generated as PDFs and stored via Trieve, then synced with Vapi KBs.
+- All API endpoints require a Clerk session (`middleware.ts`).
+- The routes listed under "API Endpoints Reference" are the legacy per-session models. They are kept until the migration has run and will then be removed.
+- Coin balances change only on the server. The browser can no longer set them.
 
 ---
 
