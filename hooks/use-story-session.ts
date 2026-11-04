@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Asset, SaveFile } from "@/lib/save/schema";
 import type { TableEvent, TranscriptLine, TurnInput } from "@/lib/storyteller/events";
+import type { ModelId } from "@/lib/storyteller/models";
 
 export type FeedLine = TranscriptLine & { id: number; live?: boolean } | { id: number; kind: "notice"; speaker: "system"; text: string };
 
@@ -228,6 +229,22 @@ export function useStorySession(campaignId: string) {
   const clearChanged = useCallback((key: keyof StoryState["changed"]) => {
     setState((s) => ({ ...s, changed: { ...s.changed, [key]: false } }));
   }, []);
+  const setModel = useCallback(
+    async (modelId: ModelId) => {
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setState((s) => ({ ...s, error: { code: "http", message: body.error ?? "Couldn't switch models." } }));
+        return;
+      }
+      setState((s) => ({ ...s, save: body.save }));
+    },
+    [campaignId],
+  );
   const dismissHandout = useCallback(() => setState((s) => ({ ...s, handout: undefined })), []);
   const dismissError = useCallback(() => setState((s) => ({ ...s, error: undefined })), []);
 
@@ -243,5 +260,5 @@ export function useStorySession(campaignId: string) {
     };
   }, [load, send]);
 
-  return { state, send, clearChanged, dismissHandout, dismissError };
+  return { state, send, setModel, clearChanged, dismissHandout, dismissError };
 }

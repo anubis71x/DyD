@@ -1,3 +1,4 @@
+import { DEFAULT_MODEL_ID, type ModelId } from "@/lib/storyteller/models";
 import {
   SAVE_SCHEMA_VERSION,
   type Character,
@@ -44,6 +45,7 @@ export function newSave(params: {
   storytellerId: string;
   now: string;
   language?: string;
+  modelId?: ModelId;
 }): SaveFile {
   return {
     schemaVersion: SAVE_SCHEMA_VERSION,
@@ -51,6 +53,7 @@ export function newSave(params: {
     ownerId: params.ownerId,
     title: params.title,
     storytellerId: params.storytellerId,
+    modelId: params.modelId ?? DEFAULT_MODEL_ID,
     createdAt: params.now,
     updatedAt: params.now,
     revision: 0,
@@ -83,6 +86,10 @@ export function applyEvent(save: SaveFile, event: SaveEvent, now: string): SaveF
   switch (event.type) {
     case "campaign.rename":
       s.title = event.title;
+      break;
+
+    case "campaign.model":
+      s.modelId = event.modelId;
       break;
 
     case "character.update": {

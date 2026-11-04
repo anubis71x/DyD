@@ -31,11 +31,10 @@ Environment (`.env.local`):
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | Clerk auth |
 | `STRIPE_SECRET_KEY` | Stripe |
 | `ANTHROPIC_API_KEY` | Claude API key for the storyteller |
-| `STORYTELLER_MODEL` | Optional. Defaults to `claude-opus-5-5` |
-| `STORYTELLER_EFFORT` | Optional. `low` (default) to `max`; higher is slower but more thorough |
-| `COINS_PER_TURN` | Optional. Coins charged per storyteller turn, default `1` |
 
 The old `NEXT_PUBLIC_VAPI_*` and `TRIEVE_*` variables are no longer used and can be deleted.
+
+Players choose the storyteller's model per campaign and can switch during play: Claude Haiku 5.5 (default, 1 coin per turn), Sonnet 5.5 (2) or Opus 5.5 (3). Models, effort levels and coin prices are set in `lib/storyteller/models.ts`. Each play session records token usage per model (`playsessions.usage`), so prices can be checked against real costs.
 
 Checks: `yarn test` (unit tests), `yarn typecheck`, `yarn lint`.
 
@@ -57,8 +56,9 @@ All routes require a signed-in Clerk user, and every read or write is scoped to 
 | Route | Purpose |
 |---|---|
 | `GET /api/campaigns` | List your campaigns and coin balance |
-| `POST /api/campaigns` | Start a campaign `{ storytellerId }` |
+| `POST /api/campaigns` | Start a campaign `{ storytellerId, modelId? }` |
 | `GET /api/campaigns/[id]` | Save file plus the current session's transcript |
+| `PATCH /api/campaigns/[id]` | Switch the storyteller's model `{ modelId }` |
 | `DELETE /api/campaigns/[id]` | Delete a campaign |
 | `POST /api/campaigns/[id]/turn` | Play a turn (`begin`, `text`, `choice` or `roll`); streams table events as server-sent events |
 | `GET /api/campaigns/[id]/export` | Download the `.dydsave` file |

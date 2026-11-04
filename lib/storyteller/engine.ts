@@ -10,24 +10,44 @@ import type {
 import { applyEvents } from "@/lib/save/reducer";
 import type { SaveEvent } from "@/lib/save/schema";
 import { commitEvents, loadCampaign } from "@/lib/save/service";
-import type { PlaySession, Stores } from "@/lib/save/store";
+import type { PlaySession, SessionUsage, Stores } from "@/lib/save/store";
 import { checkOutcome, describeRoll, DiceError, roll } from "./dice";
 import type { TableEvent, TurnInput } from "./events";
 import { buildSystemPrompt, sessionOpening } from "./prompt";
 import { SayParser } from "./sayParser";
+import { getModel, type StorytellerModel } from "./models";
 import { getStoryteller } from "./storytellers";
 import { runTool, TOOL_PARAMS } from "./tools";
 
 export const ENGINE_CONFIG = {
-  model: process.env.STORYTELLER_MODEL || "claude-opus-5-5",
-  // Spoken, conversational replies: low effort keeps turns fast. Raise it
-  // with STORYTELLER_EFFORT if scenes feel thin.
-  effort: (process.env.STORYTELLER_EFFORT || "low") as "low" | "medium" | "high" | "xhigh" | "max",
   maxTokens: 16000,
   maxToolRounds: 8,
-  coinsPerTurn: Number(process.env.COINS_PER_TURN ?? 1),
   sessionIdleMs: 6 * 60 * 60 * 1000,
 };
+
+/** Request fields that depend on the chosen model. */
+export function modelParams(model: StorytellerModel) {
+  return {
+    model: model.apiModel,
+    output_config: { effort: model.effort },
+    // Haiku 5.5 has no server-side fallback; sending `fallbacks` to it is wrong.
+    ...(model.serverFallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+  };
+}
+
+const EMPTY_USAGE: SessionUsage = { turns: 0, calls: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, coins: 0 };
+
+function addUsage(prev: SessionUsage | undefined, u: BetaMessage["usage"]): SessionUsage {
+  const base = prev ?? EMPTY_USAGE;
+  return {
+    ...base,
+    calls: base.calls + 1,
+    inputTokens: base.inputTokens + (u?.input_tokens ?? 0),
+    outputTokens: base.outputTokens + (u?.output_tokens ?? 0),
+    cacheReadTokens: base.cacheReadTokens + (u?.cache_read_input_tokens ?? 0),
+    cacheWriteTokens: base.cacheWriteTokens + (u?.cache_creation_input_tokens ?? 0),
+  };
+}
 
 export interface TurnDeps {
   stores: Stores;
@@ -91,6 +111,8 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
   const { stores, client, emit } = deps;
   let save = await loadCampaign(stores, ownerId, campaignId);
   const st = getStoryteller(save.storytellerId);
+  const model = getModel(save.modelId);
+  const cost = model.coinsPerTurn;
 
   const { text: playerText, error } = playerContent(input, deps);
   if (error) {
@@ -105,8 +127,11 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
     return;
   }
 
-  if (!(await stores.wallet.debit(ownerId, ENGINE_CONFIG.coinsPerTurn))) {
-    emit({ type: "error", code: "out_of_coins", message: "You're out of coins. Add more to keep playing." });
+  if (!(await stores.wallet.debit(ownerId, cost))) {
+    const msg = cost > 1
+      ? `A turn with ${model.name} costs ${cost} coins and you don't have enough. Add coins or switch to a lighter model.`
+      : "You're out of coins. Add more to keep playing.";
+    emit({ type: "error", code: "out_of_coins", message: msg });
     return;
   }
   emit({ type: "turn.start", sessionNo: session.sessionNo });
@@ -117,8 +142,13 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
   const messages = asMessages(session.messages);
   messages.push({ role: "user", content });
 
+  // Per-model running totals for this session (real cost data for pricing coins).
+  const usage = { ...(session.usage ?? {}) };
+  const prev = usage[model.id] ?? EMPTY_USAGE;
+  usage[model.id] = { ...prev, turns: prev.turns + 1, coins: prev.coins + cost };
+
   const persist = () =>
-    stores.sessions.update(ownerId, session.sessionId, { messages, lastActiveAt: new Date().toISOString() });
+    stores.sessions.update(ownerId, session.sessionId, { messages, usage, lastActiveAt: new Date().toISOString() });
 
   let produced = false;
   try {
@@ -130,15 +160,12 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
 
       const stream = client.beta.messages.stream(
         {
-          model: ENGINE_CONFIG.model,
+          ...modelParams(model),
           max_tokens: ENGINE_CONFIG.maxTokens,
           system: [{ type: "text", text: buildSystemPrompt(st), cache_control: { type: "ephemeral" } }],
           tools: TOOL_PARAMS,
           messages,
-          output_config: { effort: ENGINE_CONFIG.effort },
           cache_control: { type: "ephemeral" },
-          betas: ["server-side-fallback-2026-07-01"],
-          fallbacks: "default",
         },
         { signal: deps.signal },
       );
@@ -159,11 +186,18 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
       emit({ type: "speech.end" });
 
       messages.push({ role: "assistant", content: message.content });
+      usage[model.id] = addUsage(usage[model.id], message.usage);
       await persist();
       produced = true;
 
       if (message.stop_reason === "refusal") {
-        emit({ type: "error", code: "refused", message: "The storyteller couldn't continue that scene. Try steering the story another way." });
+        emit({
+          type: "error",
+          code: "refused",
+          message: model.serverFallback
+            ? "The storyteller couldn't continue that scene. Try steering the story another way."
+            : `${model.name} couldn't continue that scene. Try steering the story another way, or switch to a different model.`,
+        });
         break;
       }
       if (message.stop_reason === "pause_turn") continue;
@@ -204,14 +238,18 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
       if (yieldToPlayer) break;
     }
   } catch (err) {
-    if (!produced) await stores.wallet.credit(ownerId, ENGINE_CONFIG.coinsPerTurn);
+    if (!produced) {
+      await stores.wallet.credit(ownerId, cost);
+      const u = usage[model.id];
+      usage[model.id] = { ...u, turns: u.turns - 1, coins: u.coins - cost };
+    }
     // Keep the stored history valid: drop a trailing user message the model never answered.
     if (!produced && messages[messages.length - 1]?.role === "user") {
       messages.pop();
-      await persist();
     }
+    await persist();
     if (err instanceof Anthropic.APIError || (err as Error)?.name === "AbortError") {
-      emit({ type: "error", code: "upstream", message: "The storyteller is unavailable right now. Your coin was refunded if nothing was said." });
+      emit({ type: "error", code: "upstream", message: produced ? "The storyteller stopped partway. What was said is saved." : "The storyteller is unavailable right now. Your coins were refunded." });
       console.error("[storyteller] API error", err instanceof Anthropic.APIError ? err.status : "", (err as Error).message);
       return;
     }

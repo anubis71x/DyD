@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { createMemoryStores } from "@/lib/save/memoryStore";
-import { createCampaign } from "@/lib/save/service";
+import { commitEvents, createCampaign } from "@/lib/save/service";
 import { runTurn } from "@/lib/storyteller/engine";
 import type { TableEvent } from "@/lib/storyteller/events";
 
@@ -26,7 +26,7 @@ function fakeClient(script: Array<{ content: any[]; stop_reason: string }>) {
             },
             async finalMessage() {
               for (const b of msg.content) if (b.type === "text") for (const ch of b.text.match(/[\s\S]{1,5}/g) ?? []) listeners.forEach((f) => f(ch));
-              return { id: "m", type: "message", role: "assistant", model: "x", usage: {}, ...msg };
+              return { id: "m", type: "message", role: "assistant", model: "x", usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 900, cache_creation_input_tokens: 0 }, ...msg };
             },
           };
         },
@@ -36,9 +36,9 @@ function fakeClient(script: Array<{ content: any[]; stop_reason: string }>) {
   return { client: client as unknown as Anthropic, requests };
 }
 
-async function setup(coins = 5) {
+async function setup(coins = 5, modelId?: "haiku" | "sonnet" | "opus") {
   const mem = createMemoryStores({ u: coins });
-  const campaign = await createCampaign(mem.stores, "u", { title: "T", storytellerId: "eldrath" });
+  const campaign = await createCampaign(mem.stores, "u", { title: "T", storytellerId: "eldrath", ...(modelId ? { modelId } : {}) });
   return { ...mem, campaign };
 }
 
@@ -72,7 +72,10 @@ describe("runTurn", () => {
     expect(events.at(-1)).toEqual({ type: "done", coins: 4 });
 
     // Request shape: cached static system prompt, fallbacks on, history grows by appending.
-    expect(requests[0]).toMatchObject({ model: "claude-opus-5-5", fallbacks: "default", betas: ["server-side-fallback-2026-07-01"] });
+    // Default model is Haiku 5.5, which has no server-side fallback: no fallbacks/betas sent.
+    expect(requests[0]).toMatchObject({ model: "claude-haiku-5-5", output_config: { effort: "medium" } });
+    expect(requests[0]).not.toHaveProperty("fallbacks");
+    expect(requests[0]).not.toHaveProperty("betas");
     expect(requests[0].system[0].cache_control).toEqual({ type: "ephemeral" });
     expect(requests[1].system).toEqual(requests[0].system);
     expect(requests[1].messages.slice(0, requests[0].messages.length)).toEqual(requests[0].messages);
@@ -124,5 +127,40 @@ describe("runTurn", () => {
     expect(events.at(-1)).toMatchObject({ type: "error", code: "upstream" });
     expect(_debug.coins.get("u")).toBe(2);
     expect(Array.from(_debug.sessions.values())[0].messages).toEqual([]);
+  });
+
+  it("uses the campaign's model, its coin price and refusal fallbacks where supported", async () => {
+    const { stores, campaign, _debug } = await setup(5, "opus");
+    const { client, requests } = fakeClient([{ stop_reason: "end_turn", content: [{ type: "text", text: "Hello." }] }]);
+    const events: TableEvent[] = [];
+    await runTurn("u", campaign.campaignId, { type: "begin" }, { stores, client, emit: (e) => events.push(e) });
+    expect(requests[0]).toMatchObject({ model: "claude-opus-5-5", fallbacks: "default", betas: ["server-side-fallback-2026-07-01"] });
+    expect(events.at(-1)).toEqual({ type: "done", coins: 2 });
+    const session = Array.from(_debug.sessions.values())[0];
+    expect(session.usage?.opus).toEqual({ turns: 1, calls: 1, inputTokens: 100, outputTokens: 20, cacheReadTokens: 900, cacheWriteTokens: 0, coins: 3 });
+  });
+
+  it("switching models mid-campaign takes effect on the next turn", async () => {
+    const { stores, campaign } = await setup(10);
+    const { client, requests } = fakeClient([
+      { stop_reason: "end_turn", content: [{ type: "text", text: "One." }] },
+      { stop_reason: "end_turn", content: [{ type: "text", text: "Two." }] },
+    ]);
+    const deps = { stores, client, emit: () => {} };
+    await runTurn("u", campaign.campaignId, { type: "begin" }, deps);
+    await commitEvents(stores, "u", campaign.campaignId, [{ type: "campaign.model", modelId: "sonnet" }], "user");
+    await runTurn("u", campaign.campaignId, { type: "text", text: "next" }, deps);
+    expect(requests.map((r) => r.model)).toEqual(["claude-haiku-5-5", "claude-sonnet-5-5"]);
+    expect(await stores.wallet.balance("u")).toBe(10 - 1 - 2);
+  });
+
+  it("explains when the balance covers a cheaper model but not this one", async () => {
+    const { stores, campaign } = await setup(2, "opus");
+    const { client, requests } = fakeClient([]);
+    const events: TableEvent[] = [];
+    await runTurn("u", campaign.campaignId, { type: "begin" }, { stores, client, emit: (e) => events.push(e) });
+    expect(requests).toHaveLength(0);
+    expect(events[0]).toMatchObject({ type: "error", code: "out_of_coins", message: expect.stringContaining("3 coins") });
+    expect(await stores.wallet.balance("u")).toBe(2);
   });
 });

@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useStorySession, type DiceView, type FeedLine, type StoryState } from "@/hooks/use-story-session";
 import type { SaveFile } from "@/lib/save/schema";
+import { DEFAULT_MODEL_ID, getModel } from "@/lib/storyteller/models";
 import { getStoryteller } from "@/lib/storyteller/storytellers";
 import { voiceLabel } from "@/lib/storyteller/voices";
 import type { TurnInput } from "@/lib/storyteller/events";
+import { ModelSelect } from "./ModelPicker";
 import { AccentScope, Chip, npcColor, Portrait } from "./ui";
 
 const mix = (pct: number) => `color-mix(in srgb, var(--accent) ${pct}%, transparent)`;
@@ -175,7 +177,7 @@ function InputPanel({ state, send }: { state: StoryState; send: (i: TurnInput) =
           <button type="button" disabled className="rounded-full px-3 py-1 text-zinc-600" title="Paused for maintenance">Open mic</button>
           <button type="button" aria-pressed="true" className="rounded-full bg-[#151a22] px-3 py-1 text-zinc-100 ring-1 ring-white/10">Text</button>
         </div>
-        <span className="text-[11px] text-zinc-500">Voice is paused for maintenance · 1 coin per turn</span>
+        <span className="text-[11px] text-zinc-500">Voice is paused for maintenance · {getModel(state.save!.modelId).coinsPerTurn} coin{getModel(state.save!.modelId).coinsPerTurn === 1 ? "" : "s"} per turn</span>
       </div>
     </section>
   );
@@ -482,7 +484,7 @@ const RAIL: { key: DrawerKey; label: string; path: string }[] = [
 /* ----------------------------------------------------------------- table */
 
 export function StoryTable({ campaignId }: { campaignId: string }) {
-  const { state, send, clearChanged, dismissError } = useStorySession(campaignId);
+  const { state, send, setModel, clearChanged, dismissError } = useStorySession(campaignId);
   const [drawer, setDrawer] = useState<DrawerKey | null>(null);
 
   useEffect(() => {
@@ -513,7 +515,8 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
           <span className="text-xs text-zinc-500">{state.sessionNo ? `Session ${state.sessionNo} · ` : ""}told by {st.name}</span>
         </div>
         <div className="flex-1" />
-        <span className="hidden rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-xs text-zinc-400 sm:inline">✓ Saved · rev {save.revision}</span>
+        <ModelSelect value={save.modelId ?? DEFAULT_MODEL_ID} onChange={setModel} disabled={state.busy} />
+        <span className="hidden rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-xs text-zinc-400 xl:inline">✓ Saved · rev {save.revision}</span>
         <a href={`/api/campaigns/${campaignId}/export`} className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-400 hover:text-zinc-100 md:inline">Download save</a>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-sm">
           <span className="h-2.5 w-2.5 rounded-full bg-[#e8c060] shadow-[0_0_6px_#e8c06099]" />

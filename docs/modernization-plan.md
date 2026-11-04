@@ -255,6 +255,7 @@ Vapi is removed and voice play is paused. Text play runs on the new stack:
 - **Phase 1:** done. `lib/save/` (schema, reducer, event log, Mongo + in-memory stores, `.dydsave` export/import) and `scripts/migrate-legacy.ts`.
 - **Phase 2:** text half done. `lib/storyteller/` runs Claude with the game tools, `<say>` speaker tags, voice casting from the library and server-side dice. LiveKit, STT and TTS are not started yet.
 - **Phase 3:** partly done. Library + storyteller picker at `/dashboard/narrator`, Story Table at `/dashboard/play/[id]` (text input, choices, dice, scene, character/quest/cast/map drawers).
+- Model choice: players pick Haiku 5.5 (default), Sonnet 5.5 or Opus 5.5 per campaign and can switch mid-campaign; coins per turn depend on the model, and sessions log token usage per model.
 - Not yet: session-end recaps (the `memory.recap` event exists, nothing writes it), an image provider, ambience audio, voice.
 
 

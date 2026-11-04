@@ -6,6 +6,7 @@ import { CampaignLibrary } from "@/components/story/CampaignLibrary";
 import { StorytellerPicker } from "@/components/story/StorytellerPicker";
 import { displayFont } from "@/components/story/ui";
 import type { CampaignSummary } from "@/lib/save/store";
+import type { ModelId } from "@/lib/storyteller/models";
 
 export default function CampaignsPage() {
   const router = useRouter();
@@ -26,13 +27,13 @@ export default function CampaignsPage() {
     void refresh();
   }, [refresh]);
 
-  async function start(storytellerId: string) {
+  async function start(storytellerId: string, modelId: ModelId) {
     setStarting(true);
     setError(null);
     const res = await fetch("/api/campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ storytellerId }),
+      body: JSON.stringify({ storytellerId, modelId }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {

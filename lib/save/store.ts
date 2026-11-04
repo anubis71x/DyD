@@ -11,6 +11,7 @@ export interface CampaignSummary {
   campaignId: string;
   title: string;
   storytellerId: string;
+  modelId?: string;
   characterName: string;
   updatedAt: string;
   revision: number;
@@ -35,6 +36,18 @@ export interface PlaySession {
   startedAt: string;
   lastActiveAt: string;
   endedAt?: string;
+  /** API usage per model for this session, to price coins from real numbers. */
+  usage?: Record<string, SessionUsage>;
+}
+
+export interface SessionUsage {
+  turns: number;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  coins: number;
 }
 
 export interface Stores {
@@ -51,7 +64,7 @@ export interface Stores {
     latest(ownerId: string, campaignId: string): Promise<PlaySession | null>;
     count(ownerId: string, campaignId: string): Promise<number>;
     create(session: PlaySession): Promise<void>;
-    update(ownerId: string, sessionId: string, patch: Partial<Pick<PlaySession, "messages" | "lastActiveAt" | "endedAt">>): Promise<void>;
+    update(ownerId: string, sessionId: string, patch: Partial<Pick<PlaySession, "messages" | "lastActiveAt" | "endedAt" | "usage">>): Promise<void>;
   };
   wallet: {
     balance(userId: string): Promise<number>;
@@ -67,6 +80,7 @@ export function summarize(save: SaveFile): CampaignSummary {
     campaignId: save.campaignId,
     title: save.title,
     storytellerId: save.storytellerId,
+    ...(save.modelId ? { modelId: save.modelId } : {}),
     characterName: save.character.name,
     updatedAt: save.updatedAt,
     revision: save.revision,

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { DEFAULT_MODEL_ID, getModel, MODEL_IDS, type ModelId } from "@/lib/storyteller/models";
 import { STORYTELLERS, type Storyteller } from "@/lib/storyteller/storytellers";
 import { VOICE_BY_ID } from "@/lib/storyteller/voices";
+import { ModelCards } from "./ModelPicker";
 import { AccentScope, Chip } from "./ui";
 
 function StorytellerCard({ st, selected, onSelect }: { st: Storyteller; selected: boolean; onSelect: () => void }) {
@@ -58,8 +60,23 @@ function StorytellerCard({ st, selected, onSelect }: { st: Storyteller; selected
   );
 }
 
-export function StorytellerPicker({ onStart, busy }: { onStart: (storytellerId: string) => void; busy: boolean }) {
+const MODEL_KEY = "dreampool.model";
+
+export function StorytellerPicker({ onStart, busy }: { onStart: (storytellerId: string, modelId: ModelId) => void; busy: boolean }) {
   const [selected, setSelected] = useState(STORYTELLERS[0].id);
+  const [modelId, setModelId] = useState<ModelId>(DEFAULT_MODEL_ID);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(MODEL_KEY);
+      if (saved && (MODEL_IDS as string[]).includes(saved)) setModelId(saved as ModelId);
+    } catch {}
+  }, []);
+  const pickModel = (id: ModelId) => {
+    setModelId(id);
+    try {
+      localStorage.setItem(MODEL_KEY, id);
+    } catch {}
+  };
   const st = STORYTELLERS.find((s) => s.id === selected)!;
   return (
     <section aria-labelledby="pick-heading" className="flex flex-col gap-5">
@@ -74,15 +91,16 @@ export function StorytellerPicker({ onStart, busy }: { onStart: (storytellerId: 
           <StorytellerCard key={s.id} st={s} selected={s.id === selected} onSelect={() => setSelected(s.id)} />
         ))}
       </div>
-      <AccentScope color={st.accentColor}>
+      <AccentScope color={st.accentColor} className="flex flex-col gap-4">
+        <ModelCards value={modelId} onChange={pickModel} />
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#151a22]/90 p-4">
           <p className="text-sm text-zinc-400">
-            <span className="font-semibold text-zinc-100">{st.name}</span> · {st.styleTags.join(", ")}
+            <span className="font-semibold text-zinc-100">{st.name}</span> on {getModel(modelId).name} · {getModel(modelId).coinsPerTurn} coin{getModel(modelId).coinsPerTurn === 1 ? "" : "s"} per turn
           </p>
           <button
             type="button"
             disabled={busy}
-            onClick={() => onStart(st.id)}
+            onClick={() => onStart(st.id, modelId)}
             className="rounded-full bg-[color:var(--accent)] px-5 py-2.5 font-semibold text-[#14100b] transition hover:brightness-110 disabled:opacity-50"
           >
             {busy ? "Setting the table…" : `Begin with ${st.name.split(" ")[0]} →`}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MODEL_IDS } from "@/lib/storyteller/models";
 
 /**
  * Dreampool save file, version 1.
@@ -92,6 +93,8 @@ export const SaveFileSchema = z.object({
   ownerId: z.string().min(1),
   title: shortText,
   storytellerId: id,
+  /** Model the storyteller runs on. Optional so older saves stay valid; missing means the default. */
+  modelId: z.enum(MODEL_IDS).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   revision: z.number().int().min(0),
@@ -147,6 +150,7 @@ export type Asset = z.infer<typeof AssetSchema>;
 
 export const SaveEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("campaign.rename"), title: shortText }),
+  z.object({ type: z.literal("campaign.model"), modelId: z.enum(MODEL_IDS) }),
   z.object({
     type: z.literal("character.update"),
     patch: z

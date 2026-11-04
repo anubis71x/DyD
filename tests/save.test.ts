@@ -22,6 +22,13 @@ describe("reducer", () => {
     expect(next.revision).toBe(1);
   });
 
+  it("defaults new campaigns to Haiku and records model switches", () => {
+    expect(base().modelId).toBe("haiku");
+    expect(applyEvent(base(), { type: "campaign.model", modelId: "opus" }, NOW).modelId).toBe("opus");
+    const { modelId, ...legacy } = base();
+    expect(SaveFileSchema.safeParse(legacy).success).toBe(true); // older saves without a model stay valid
+  });
+
   it("clamps resources between 0 and max", () => {
     let s = applyEvent(base(), { type: "character.resource", name: "HP", set: 30, max: 32 }, NOW);
     s = applyEvent(s, { type: "character.resource", name: "HP", delta: 10 }, NOW);

@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import type { CampaignSummary } from "@/lib/save/store";
+import { getModel } from "@/lib/storyteller/models";
 import { getStoryteller } from "@/lib/storyteller/storytellers";
 import { AccentScope } from "./ui";
 
@@ -75,7 +76,7 @@ export function CampaignLibrary({
                     <div>
                       <h3 className="font-[family-name:var(--font-display)] text-2xl font-semibold leading-tight">{c.title}</h3>
                       <p className="text-xs text-zinc-500">
-                        {c.characterName || "No character yet"} · told by {st.name} · {formatDistanceToNow(new Date(c.updatedAt), { addSuffix: true })}
+                        {c.characterName || "No character yet"} · told by {st.name} on {getModel(c.modelId).name.replace("Claude ", "")} · {formatDistanceToNow(new Date(c.updatedAt), { addSuffix: true })}
                       </p>
                     </div>
                     {c.lastRecap && <p className="line-clamp-3 text-sm text-zinc-400">{c.lastRecap}</p>}

@@ -41,6 +41,7 @@ const playSessionSchema = new mongoose.Schema(
     startedAt: { type: Date, required: true },
     lastActiveAt: { type: Date, required: true },
     endedAt: { type: Date },
+    usage: { type: mongoose.Schema.Types.Mixed },
   },
   { versionKey: false, minimize: false },
 );
@@ -59,6 +60,7 @@ const toSession = (d: Record<string, any>): PlaySession => ({
   startedAt: new Date(d.startedAt).toISOString(),
   lastActiveAt: new Date(d.lastActiveAt).toISOString(),
   ...(d.endedAt ? { endedAt: new Date(d.endedAt).toISOString() } : {}),
+  ...(d.usage ? { usage: d.usage } : {}),
 });
 
 export async function getMongoStores(): Promise<Stores> {
@@ -132,6 +134,7 @@ const mongoStores: Stores = {
       if (patch.messages) $set.messages = patch.messages;
       if (patch.lastActiveAt) $set.lastActiveAt = new Date(patch.lastActiveAt);
       if (patch.endedAt) $set.endedAt = new Date(patch.endedAt);
+      if (patch.usage) $set.usage = patch.usage;
       await PlaySessionModel.updateOne({ _id: sessionId, ownerId }, { $set });
     },
   },

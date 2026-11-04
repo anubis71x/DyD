@@ -3,6 +3,7 @@ import { z } from "zod";
 import { handle, HttpError, requireUser } from "@/lib/api/http";
 import { getMongoStores } from "@/lib/save/mongoStore";
 import { createCampaign } from "@/lib/save/service";
+import { MODEL_IDS } from "@/lib/storyteller/models";
 import { STORYTELLERS } from "@/lib/storyteller/storytellers";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ const CreateBody = z.object({
   storytellerId: z.enum(STORYTELLERS.map((s) => s.id) as [string, ...string[]]),
   title: z.string().trim().min(1).max(80).optional(),
   language: z.string().min(2).max(40).optional(),
+  modelId: z.enum(MODEL_IDS).optional(),
 });
 
 export const POST = handle("campaigns_POST", async (req: NextRequest) => {
@@ -34,6 +36,7 @@ export const POST = handle("campaigns_POST", async (req: NextRequest) => {
     title: body.data.title ?? "A new tale",
     storytellerId: body.data.storytellerId,
     ...(body.data.language ? { language: body.data.language } : {}),
+    ...(body.data.modelId ? { modelId: body.data.modelId } : {}),
   });
   return NextResponse.json({ campaignId: save.campaignId }, { status: 201 });
 });

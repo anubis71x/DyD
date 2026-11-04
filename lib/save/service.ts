@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { applyEvents, newSave } from "./reducer";
 import { SaveFileSchema, type SaveEvent, type SaveFile } from "./schema";
 import type { StoredEvent, Stores } from "./store";
+import type { ModelId } from "@/lib/storyteller/models";
 
 export class NotFoundError extends Error {}
 export class ConflictError extends Error {}
@@ -9,7 +10,7 @@ export class ConflictError extends Error {}
 export async function createCampaign(
   stores: Stores,
   ownerId: string,
-  params: { title: string; storytellerId: string; language?: string },
+  params: { title: string; storytellerId: string; language?: string; modelId?: ModelId },
   now = new Date().toISOString(),
 ): Promise<SaveFile> {
   const save = newSave({ campaignId: randomUUID(), ownerId, now, ...params });
