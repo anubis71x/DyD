@@ -63,7 +63,25 @@ Pipeline details:
 - **Latency target:** under 800 ms from end of user speech to first audio. Stream STT partials, stream LLM tokens into TTS sentence by sentence, and start TTS on the first clause.
 - **Multilingual:** the current first message offers English, Español and 日本語. Pick STT and TTS models with multilingual support, and store `language` in player preferences so the pipeline can switch STT language hints.
 
-### 2.2 Tools run server-side, bound to the session
+### 2.2 Lessons from an earlier prototype
+
+We already have a working voice-roleplay prototype: Python/FastAPI, Claude for replies, ElevenLabs for both STT and TTS, server-side VAD, and replies split into sentences that stream to TTS over SSE. That confirms the cascaded design and the vendor pair. What to carry over and what to change:
+
+| Prototype behavior | Keep / change for DyD |
+|---|---|
+| Claude reply split into sentences, each streamed to TTS | **Keep.** This is the main latency trick, and it works. |
+| ElevenLabs voices | **Keep** as the default TTS vendor. Voice quality is already proven. |
+| `cast.json` maps each speaker to a voice ID | **Keep and extend.** NPCs can get their own voices, not just the narrator. Have the LLM tag each speaker's lines (e.g. `<npc id="...">`), and route each span to that speaker's voice. Store `voiceId` on each NPC in the save file. |
+| Story presets + reusable characters included with `{{id}}` | **Keep the idea.** It becomes narrator personas and campaign templates, plus a reusable NPC library. Expand `{{id}}` server-side, as the prototype does. |
+| Browser `MediaRecorder` uploads WebM chunks on a timer, then batch STT | **Change.** Use continuous audio over WebRTC with streaming STT. Timeslice chunking is the main cause of the prototype's uneven input latency. |
+| Server-side VAD with silence threshold + padding | **Keep the approach**, but add a semantic end-of-turn model (LiveKit's turn detector) so short pauses mid-thought don't trigger a reply. |
+| User input is queued while the assistant is speaking | **Change to barge-in.** If the player speaks, stop TTS, keep the part of the reply already spoken in history, and drop the rest. |
+| MP3 chunks played through an `<audio>` element | **Replace.** Send PCM frames over WebRTC, so we don't have to manage gaps between chunks on the client. |
+| Session state only in the prompt / `localStorage` | **Replace** with the save file (§3). |
+
+Because the prototype is Python, its `cascade_engine` logic could carry over if we chose LiveKit Agents for **Python** instead of Node. See open decision 7.
+
+### 2.3 Tools run server-side, bound to the session
 
 Game tools (`update_character`, `add_quest`, `update_quest_status`, `upsert_npc`, `log_world_event`, `record_mechanic`, `set_preferences`, `rename_campaign`) run **inside the agent process**:
 
@@ -165,3 +183,5 @@ Phase 0 is small and independent. Since problem 1 leaks user data, I'd ship it f
 4. **Transcript retention**: store full transcripts (better recaps, privacy cost) or only summaries?
 5. **Multiple saves per user**: the current UI assumes one session per user (`data[0]`). The new model supports many campaigns. Do we want campaign slots in the UI?
 6. **Database**: stay on Mongo (recommended for now) or move to Postgres + jsonb + pgvector during the rewrite.
+7. **Agent language**: Node/TS (one language with the Next app; recommended) or Python (reuses the prototype's engine code; LiveKit Agents supports both).
+8. **Truly local TTS**: the prototype is cloud TTS (ElevenLabs). If a self-hosted voice model is a goal for cost or privacy, plan for a GPU worker behind the same TTS interface. Treat it as a later swap, not a launch requirement.
