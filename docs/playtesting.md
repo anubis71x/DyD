@@ -82,7 +82,9 @@ Players now choose Brief, Standard or Rich replies on the play screen (default S
 
 The same change brought in the strongest parts of the old Vapi prompt: asking for a game style and dice preference before the first scene, danger matched to the style (no unearned deaths), an encounter checklist (goal, intentions, terrain, timer, reward, readable way out, a mid-encounter shift), letting characters talk in conversations, five-senses description, no flattery from strangers, and generous handling of speech-recognition errors.
 
-None of this has been playtested yet: the API account ran out of credit. Before shipping, run the harbor script on each model at `--length brief` and `--length rich`, and compare cost per turn with Standard (the Rich hint says it costs a little more).
+Rough check without the API (2026-11-05): three Haiku helper agents in a Claude Code session played the harbor script as the storyteller, one per length, reading the real system prompt and opening. Their recorded tool calls were replayed through the real tools and audit. Averages were 34 / 60 / 129 words per reply for Brief / Standard / Rich, with zero audit findings; every opening asked for the game style and dice preference; every character was cast and had a voice. All three agents were unsure what to do when the player skips the style question, so the prompt now says: use the default, record it, carry on. This is a smoke test, not a playtest: no real tool results, caching, costs or latency.
+
+Not playtested on the real engine yet: the API account ran out of credit. Before shipping, run the harbor script on each model at `--length brief` and `--length rich`, and compare cost per turn with Standard (the Rich hint says it costs a little more).
 
 ### Still open
 
