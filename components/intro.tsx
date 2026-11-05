@@ -19,19 +19,22 @@ interface Step {
     image?: string
 }
 
-// The old screenshots showed the Vapi call screen; add new ones (image) when the UI settles.
+// Screenshots in public/tutorial use sample data; regenerate them when the screens change.
 const steps: Step[] = [
     {
         title: "Choose your storyteller",
         description: "Click 'Start adventure', then pick who tells your story and which model runs it. Claude Haiku 5.5 is fast and costs a fraction of a cent per turn.",
+        image: "/tutorial/step-1.jpg",
     },
     {
         title: "Create your character",
         description: "Your storyteller asks who you want to be. Answer in your own words; your character sheet fills in as you talk.",
+        image: "/tutorial/step-2.jpg",
     },
     {
         title: "Play",
-        description: "Type what you do or say, or tap a suggested action. Roll dice when the storyteller asks. Everything saves as you go, and you start with $2.50 of free credit. Voice play returns soon.",
+        description: "Type what you do or say, or tap a suggested action. Roll dice when the storyteller asks. Turn on Read aloud to hear replies in your device's voices. Everything saves as you go, and you start with $2.50 of free credit.",
+        image: "/tutorial/step-3.jpg",
     },
 ]
 

@@ -12,6 +12,7 @@ import type { TurnInput } from "@/lib/storyteller/events";
 import { AddFundsDialog } from "@/components/billing/AddFunds";
 import { formatUsd } from "@/lib/billing/money";
 import { ModelSelect, perTurn } from "./ModelPicker";
+import { useReadAloud } from "./useReadAloud";
 import { AccentScope, Chip, npcColor, Portrait } from "./ui";
 
 const mix = (pct: number) => `color-mix(in srgb, var(--accent) ${pct}%, transparent)`;
@@ -124,7 +125,9 @@ function Feed({ state, send }: { state: StoryState; send: (i: TurnInput) => void
 
 /* --------------------------------------------------------------- input */
 
-function InputPanel({ state, send }: { state: StoryState; send: (i: TurnInput) => void }) {
+type ReadAloud = ReturnType<typeof useReadAloud>;
+
+function InputPanel({ state, send, readAloud }: { state: StoryState; send: (i: TurnInput) => void; readAloud: ReadAloud }) {
   const [text, setText] = useState("");
   const st = getStoryteller(state.save!.storytellerId);
   const submit = (e?: FormEvent) => {
@@ -197,8 +200,26 @@ function InputPanel({ state, send }: { state: StoryState; send: (i: TurnInput) =
           <button type="button" disabled className="rounded-full px-3 py-1 text-zinc-600" title="Paused for maintenance">Open mic</button>
           <button type="button" aria-pressed="true" className="rounded-full bg-[#151a22] px-3 py-1 text-zinc-100 ring-1 ring-white/10">Text</button>
         </div>
+        {readAloud.supported && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={readAloud.enabled}
+            onClick={readAloud.toggle}
+            title="Read replies aloud with your device's built-in voices"
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition ${
+              readAloud.enabled ? "border-[color:var(--accent)] text-zinc-100" : "border-white/10 text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <span className={`relative h-3.5 w-6 rounded-full transition ${readAloud.enabled ? "bg-[color:var(--accent)]" : "bg-white/15"}`} aria-hidden="true">
+              <span className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-all ${readAloud.enabled ? "left-3" : "left-0.5"}`} />
+            </span>
+            Read aloud{readAloud.speaking ? " · speaking" : ""}
+          </button>
+        )}
         <span className="text-[11px] text-zinc-500">
-          Voice is paused for maintenance · {state.lastTurnCostMicros !== null ? `last turn ${formatUsd(state.lastTurnCostMicros)}` : perTurn(state.save!.modelId)}
+          {readAloud.enabled ? "Device voices · full voice play is paused for maintenance" : "Voice is paused for maintenance"} ·{" "}
+          {state.lastTurnCostMicros !== null ? `last turn ${formatUsd(state.lastTurnCostMicros)}` : perTurn(state.save!.modelId)}
         </span>
       </div>
     </section>
@@ -513,7 +534,15 @@ const RAIL: { key: DrawerKey; label: string; path: string }[] = [
 /* ----------------------------------------------------------------- table */
 
 export function StoryTable({ campaignId }: { campaignId: string }) {
-  const { state, send, setModel, endSession, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId);
+  const readAloud = useReadAloud();
+  const { state, send: sendTurn, setModel, endSession, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId, { onEvent: readAloud.onEvent });
+  // Acting interrupts the storyteller, as it will with real voice.
+  const send = (input: TurnInput) => {
+    if (input.type !== "begin") readAloud.stop();
+    void sendTurn(input);
+  };
+  const { setSave } = readAloud;
+  useEffect(() => setSave(state.save), [state.save, setSave]);
   const [fundsOpen, setFundsOpen] = useState(false);
   // The balance lives in the app header; refresh it as soon as a turn settles.
   const queryClient = useQueryClient();
@@ -648,7 +677,7 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
             </div>
           )}
 
-          <InputPanel state={state} send={send} />
+          <InputPanel state={state} send={send} readAloud={readAloud} />
         </main>
 
         <aside aria-label="Scene and dice" className="overflow-y-auto border-t border-white/10 bg-[#151a22] lg:border-l lg:border-t-0">

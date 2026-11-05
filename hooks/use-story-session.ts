@@ -146,8 +146,14 @@ const initial: StoryState = {
   changed: { character: false, quests: false, cast: false, map: false },
 };
 
-export function useStorySession(campaignId: string) {
+/**
+ * `onEvent` sees every streamed table event as it arrives (used by
+ * read-aloud). Optional; held in a ref so it can change without restarting.
+ */
+export function useStorySession(campaignId: string, opts: { onEvent?: (e: TableEvent) => void } = {}) {
   const [state, setState] = useState<StoryState>(initial);
+  const onEventRef = useRef(opts.onEvent);
+  onEventRef.current = opts.onEvent;
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -218,6 +224,14 @@ export function useStorySession(campaignId: string) {
             for (const line of chunk.split("\n")) {
               if (!line.startsWith("data: ")) continue;
               const event = JSON.parse(line.slice(6)) as TableEvent;
+              if (turnSeq === myTurn || !turnDone) {
+                // Listeners (read-aloud) must never break the story stream.
+                try {
+                  onEventRef.current?.(event);
+                } catch (err) {
+                  console.warn("[table] event listener failed", err);
+                }
+              }
               if (event.type === "done") {
                 // The turn is over for the player. The stream may stay open while the
                 // server compacts a long history; the next turn can start meanwhile.
