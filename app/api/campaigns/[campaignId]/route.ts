@@ -4,7 +4,7 @@ import { handle, HttpError, requireUser } from "@/lib/api/http";
 import { getMongoStores } from "@/lib/save/mongoStore";
 import { commitEvents, loadCampaign } from "@/lib/save/service";
 import { MODEL_IDS } from "@/lib/storyteller/models";
-import { transcriptFromMessages } from "@/lib/storyteller/transcript";
+import { sessionLines } from "@/lib/storyteller/recap";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export const GET = handle("campaign_GET", async (_req: Request, { params }: Ctx)
     save,
     balanceMicros,
     sessionNo: active?.sessionNo ?? null,
-    transcript: active ? transcriptFromMessages(active.messages) : [],
+    transcript: active ? sessionLines(active) : [],
   });
 });
 

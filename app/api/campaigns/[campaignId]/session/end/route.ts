@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { handle, HttpError, requireUser } from "@/lib/api/http";
 import { getMongoStores } from "@/lib/save/mongoStore";
 import { loadCampaign } from "@/lib/save/service";
-import { campaignLockKey, CAMPAIGN_LOCK_TTL_MS, getClient } from "@/lib/storyteller/client";
+import { acquireCampaignLock, campaignLockKey, getClient } from "@/lib/storyteller/client";
 import { endSession } from "@/lib/storyteller/engine";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 /** End the current session and write its recap. Returns the updated save. */
 export const POST = handle("session_end_POST", async (_req: Request, { params }: { params: { campaignId: string } }) => {
@@ -15,7 +15,7 @@ export const POST = handle("session_end_POST", async (_req: Request, { params }:
   const stores = await getMongoStores();
   await loadCampaign(stores, userId, params.campaignId);
   const key = campaignLockKey(userId, params.campaignId);
-  const lock = await stores.locks.acquire(key, CAMPAIGN_LOCK_TTL_MS);
+  const lock = await acquireCampaignLock(stores.locks, key);
   if (!lock) throw new HttpError(409, "Wait for the storyteller to finish before ending the session.");
   try {
     const ended = await endSession(userId, params.campaignId, { stores, client: getClient(), emit: () => {} });

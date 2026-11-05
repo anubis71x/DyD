@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { createMemoryStores } from "@/lib/save/memoryStore";
 import { commitEvents, createCampaign } from "@/lib/save/service";
 import { ENGINE_CONFIG, endSession, runTurn } from "@/lib/storyteller/engine";
+import { closeIdleSessions } from "@/lib/storyteller/maintenance";
 import type { TableEvent } from "@/lib/storyteller/events";
 
 /**
@@ -17,8 +18,10 @@ const RECAP = {
   left_off: "Venn is waiting for an answer.",
 };
 
+type Reply = { content: any[]; stop_reason: string; usage?: Record<string, number> };
+
 function fakeClient(
-  script: Array<{ content: any[]; stop_reason: string }>,
+  script: Reply[],
   recap: { parsed: unknown; stop_reason?: string } = { parsed: RECAP },
 ) {
   const requests: any[] = [];
@@ -44,7 +47,8 @@ function fakeClient(
             },
             async finalMessage() {
               for (const b of msg.content) if (b.type === "text") for (const ch of b.text.match(/[\s\S]{1,5}/g) ?? []) listeners.forEach((f) => f(ch));
-              return { id: "m", type: "message", role: "assistant", model: "x", usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 900, cache_creation_input_tokens: 0 }, ...msg };
+              const usage = msg.usage ?? { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 900, cache_creation_input_tokens: 0 };
+              return { id: "m", type: "message", role: "assistant", model: "x", ...msg, usage };
             },
           };
         },
@@ -91,8 +95,9 @@ describe("runTurn", () => {
     expect(events.some((e) => e.type === "cast")).toBe(true);
     // Two Haiku calls × (100 in × $0.10 + 900 cache reads × $0.01 + 20 out × $0.50) = 58 micro-dollars; +30% → 76.
     expect(events.at(-1)).toEqual({ type: "done", balanceMicros: 5 * USD - 76, turnCostMicros: 76 });
+    // Each call is charged as it completes (38 each), then the hold is released.
     const kinds = Array.from(_debug.ledger.values()).map((e) => [e.kind, e.amountMicros]);
-    expect(kinds).toEqual([["hold", expect.any(Number)], ["release", -kinds[0][1]], ["charge", -76]]);
+    expect(kinds).toEqual([["hold", expect.any(Number)], ["charge", -38], ["charge", -38], ["release", -kinds[0][1]]]);
 
     // Request shape: cached static system prompt, fallbacks on, history grows by appending.
     // Default model is Haiku 5.5, which has no server-side fallback: no fallbacks/betas sent.
@@ -224,22 +229,67 @@ describe("sessions and recaps", () => {
     expect(_debug.ledger.get(`recap:${sessions[0].sessionId}`)).toMatchObject({ kind: "charge", amountMicros: -455 });
   });
 
-  it("rolls a long session over mid-scene without a 'previously'", async () => {
+  it("compacts a long session after the turn and continues it as the same session", async () => {
     const { stores, campaign, _debug } = await setup();
-    const { client, requests, recapRequests } = fakeClient([say("Go on."), say("The door opens.")]);
+    const big = { input_tokens: 500, output_tokens: 50, cache_read_input_tokens: ENGINE_CONFIG.compactAtTokens, cache_creation_input_tokens: 0 };
+    const { client, requests, recapRequests } = fakeClient([say("Go on."), { ...say("The door creaks."), usage: big }, say("Inside, it's dark.")]);
+    const events: TableEvent[] = [];
+    const deps = { stores, client, emit: (e: TableEvent) => events.push(e) };
+    await runTurn("u", campaign.campaignId, { type: "begin" }, deps);
+    await runTurn("u", campaign.campaignId, { type: "text", text: "I try the door" }, deps);
+
+    // The second turn's real prompt size (from usage) crossed the limit: compacted after "done".
+    expect(recapRequests).toHaveLength(1);
+    expect(recapRequests[0].messages[0].content).toContain("Session 1 is still in progress");
+    expect(events.at(-1)).toMatchObject({ type: "done" });
+    const [session] = Array.from(_debug.sessions.values());
+    expect(_debug.sessions.size).toBe(1);
+    expect(session).toMatchObject({ sessionNo: 1, partNo: 2, messages: [], carry: { leftOff: RECAP.left_off } });
+    expect(session.earlierLines?.map((l) => l.text)).toEqual(["Go on.", "I try the door", "The door creaks."]);
+    expect(session.endedAt).toBeUndefined();
+
+    // The next turn opens the new part from the carry-over, not a "previously".
+    await runTurn("u", campaign.campaignId, { type: "text", text: "I step inside" }, deps);
+    const opening = requests[2].messages[0].content[0].text;
+    expect(opening).toContain("<this_session_so_far>");
+    expect(opening).toContain(`Where it stopped: ${RECAP.left_off}`);
+    expect(opening).toContain("Don't greet them or recap");
+    expect(requests[2].messages[0].content[1].text).toBe("<player>I step inside</player>");
+    expect(requests[2].messages).toHaveLength(1);
+    // Compaction was charged once, like a recap.
+    expect(_debug.ledger.get(`compact:${session.sessionId}:1`)).toMatchObject({ kind: "charge", amountMicros: -455 });
+  });
+
+  it("writes one journal entry covering every part when the session ends", async () => {
+    const { stores, campaign, _debug } = await setup();
+    const big = { input_tokens: 500, output_tokens: 50, cache_read_input_tokens: ENGINE_CONFIG.compactAtTokens, cache_creation_input_tokens: 0 };
+    const { client, recapRequests } = fakeClient([{ ...say("The door creaks."), usage: big }, say("Inside, it's dark.")]);
     const deps = { stores, client, emit: () => {} };
     await runTurn("u", campaign.campaignId, { type: "begin" }, deps);
-    const first = Array.from(_debug.sessions.values())[0];
-    const filler = "word ".repeat(ENGINE_CONFIG.rolloverTokens); // ~5 chars/word ≈ well past the limit
-    first.messages.push({ role: "user", content: [{ type: "text", text: `<player>${filler}</player>` }] }, { role: "assistant", content: [{ type: "text", text: "Hm." }] });
+    await runTurn("u", campaign.campaignId, { type: "text", text: "I step inside" }, deps);
+    await endSession("u", campaign.campaignId, deps);
 
-    await runTurn("u", campaign.campaignId, { type: "text", text: "I open the door" }, deps);
+    expect(recapRequests).toHaveLength(2); // one compaction, one journal recap
+    const journal = recapRequests[1].messages[0].content;
+    expect(journal).toContain("Transcript of session 1:");
+    expect(journal).toContain(`Earlier in this session (summary): ${RECAP.summary}`);
+    expect(journal).toContain("Narrator: The door creaks."); // from the earlier part
+    expect(journal).toContain("Narrator: Inside, it's dark."); // from the current part
+    const save = await stores.campaigns.get("u", campaign.campaignId);
+    expect(save?.memory.sessionRecaps).toHaveLength(1);
+    expect(save?.memory.sessionRecaps[0].sessionNo).toBe(1);
+    expect(Array.from(_debug.sessions.values())[0].endedAt).toBeTruthy();
+  });
+
+  it("leaves the history alone and retries later if compaction fails", async () => {
+    const { stores, campaign, _debug } = await setup();
+    const big = { input_tokens: 500, output_tokens: 50, cache_read_input_tokens: ENGINE_CONFIG.compactAtTokens, cache_creation_input_tokens: 0 };
+    const { client, recapRequests } = fakeClient([{ ...say("The door creaks."), usage: big }], { parsed: null, stop_reason: "refusal" });
+    await runTurn("u", campaign.campaignId, { type: "begin" }, { stores, client, emit: () => {} });
     expect(recapRequests).toHaveLength(1);
-    const opening = requests[1].messages[0].content[0].text;
-    expect(opening).toContain("Continue from exactly where it stopped");
-    expect(opening).toContain(`Where it stopped: ${RECAP.left_off}`);
-    expect(requests[1].messages[0].content[1].text).toBe("<player>I open the door</player>");
-    expect(JSON.stringify(requests[1].messages).length).toBeLessThan(20_000);
+    const [session] = Array.from(_debug.sessions.values());
+    expect(session.messages).toHaveLength(2);
+    expect(session.partNo).toBe(1);
   });
 
   it("ends a session on request, and skips the recap when nothing happened", async () => {
@@ -298,5 +348,93 @@ describe("money safety", () => {
     const b = await stores.locks.acquire("k", 1);
     await new Promise((r) => setTimeout(r, 5));
     expect(await stores.locks.acquire("k", 60_000)).not.toBe(b);
+  });
+});
+
+describe("unexpected interruptions", () => {
+  /** A client whose stream emits some text and then fails with an API error. */
+  function failingClient(textBeforeFailure: string, onCall?: () => void) {
+    return {
+      beta: {
+        messages: {
+          stream() {
+            onCall?.();
+            const listeners: Array<(d: string) => void> = [];
+            return {
+              on(evt: string, fn: (d: string) => void) {
+                if (evt === "text") listeners.push(fn);
+                return this;
+              },
+              async finalMessage() {
+                if (textBeforeFailure) listeners.forEach((f) => f(textBeforeFailure));
+                const { APIError } = await import("@anthropic-ai/sdk");
+                throw new APIError(500, undefined, "boom", undefined);
+              },
+            };
+          },
+        },
+      },
+    } as unknown as Anthropic;
+  }
+
+  it("saves the player's message before calling the model", async () => {
+    const { stores, campaign, _debug } = await setup();
+    let seen: unknown[] = [];
+    const client = failingClient("", () => {
+      seen = structuredClone(Array.from(_debug.sessions.values())[0].messages);
+    });
+    await runTurn("u", campaign.campaignId, { type: "text", text: "I knock" }, { stores, client, emit: () => {} });
+    expect(JSON.stringify(seen)).toContain("<player>I knock</player>");
+  });
+
+  it("keeps a dice roll even when the model fails, so it can't be re-rolled", async () => {
+    const { stores, campaign, _debug } = await setup();
+    const events: TableEvent[] = [];
+    await runTurn("u", campaign.campaignId, { type: "roll", notation: "d20+5", label: "Stealth", dc: 14 }, { stores, client: failingClient(""), emit: (e) => events.push(e), rng: () => 3 });
+    const [session] = Array.from(_debug.sessions.values());
+    expect(JSON.stringify(session.messages)).toContain("[Dice] Stealth: 1d20+5 → [3] + 5 = 8 vs DC 14: failure");
+    expect(events.find((e) => e.type === "error")).toMatchObject({ message: expect.stringContaining("weren't charged") });
+  });
+
+  it("keeps a reply that was cut off mid-stream, marked as interrupted", async () => {
+    const { stores, campaign, _debug } = await setup();
+    const events: TableEvent[] = [];
+    await runTurn("u", campaign.campaignId, { type: "text", text: "I listen" }, { stores, client: failingClient('The singing grows. <say who="choir"'), emit: (e) => events.push(e) });
+    const [session] = Array.from(_debug.sessions.values());
+    const last = session.messages.at(-1) as any;
+    expect(last.role).toBe("assistant");
+    expect(last.content[0].text).toBe("The singing grows.\n\n[The storyteller was interrupted here.]");
+    expect(events.find((e) => e.type === "error")).toMatchObject({ message: expect.stringContaining("interrupted") });
+    // The history is still valid to continue: a new turn appends after it.
+    const { client, requests } = fakeClient([say("…and stops.")]);
+    await runTurn("u", campaign.campaignId, { type: "text", text: "Hello?" }, { stores, client, emit: () => {} });
+    expect(requests[0].messages.map((m: any) => m.role)).toEqual(["user", "assistant", "user"]);
+  });
+});
+
+describe("idle-session job", () => {
+  it("closes abandoned sessions with a recap and leaves active or busy ones", async () => {
+    const mem = createMemoryStores({ u: 5 * USD, v: 5 * USD });
+    const { stores, _debug } = mem;
+    const a = await createCampaign(stores, "u", { title: "A", storytellerId: "eldrath" });
+    const b = await createCampaign(stores, "u", { title: "B", storytellerId: "eldrath" });
+    const c = await createCampaign(stores, "v", { title: "C", storytellerId: "eldrath" });
+    const { client, recapRequests } = fakeClient([say("Once."), say("Twice."), say("Thrice.")]);
+    for (const [owner, id] of [["u", a.campaignId], ["u", b.campaignId], ["v", c.campaignId]] as const) {
+      await runTurn(owner, id, { type: "begin" }, { stores, client, emit: () => {} });
+    }
+    const byCampaign = (id: string) => Array.from(_debug.sessions.values()).find((s) => s.campaignId === id)!;
+    const old = new Date(Date.now() - ENGINE_CONFIG.sessionIdleMs - 60_000).toISOString();
+    byCampaign(a.campaignId).lastActiveAt = old; // abandoned
+    byCampaign(c.campaignId).lastActiveAt = old; // abandoned but mid-turn (locked)
+    await stores.locks.acquire(`campaign:v:${c.campaignId}`, 60_000);
+
+    const result = await closeIdleSessions(stores, client);
+    expect(result).toEqual({ found: 2, closed: 1 });
+    expect(byCampaign(a.campaignId).endedAt).toBeTruthy();
+    expect(byCampaign(b.campaignId).endedAt).toBeUndefined();
+    expect(byCampaign(c.campaignId).endedAt).toBeUndefined();
+    expect(recapRequests).toHaveLength(1);
+    expect((await stores.campaigns.get("u", a.campaignId))?.memory.sessionRecaps).toHaveLength(1);
   });
 });

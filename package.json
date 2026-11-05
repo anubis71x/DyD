@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "migrate:legacy": "tsx --env-file=.env.local scripts/migrate-legacy.ts",
     "billing": "tsx --env-file=.env.local scripts/billing.ts",
-    "billing:convert-coins": "tsx --env-file=.env.local scripts/convert-coins.ts"
+    "billing:convert-coins": "tsx --env-file=.env.local scripts/convert-coins.ts",
+    "sessions:close-idle": "tsx --env-file=.env.local scripts/close-idle-sessions.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.5.0",

@@ -41,6 +41,8 @@ export interface StoryState {
 }
 
 let nextId = 1;
+/** Increments per turn, so a finished turn's late cleanup can't touch the next one. */
+let turnSeq = 0;
 
 function diceView(e: Extract<TableEvent, { type: "dice" }>): DiceView {
   const r = e.roll;
@@ -125,7 +127,8 @@ export function reduceEvent(s: StoryState, e: TableEvent): StoryState {
     case "error":
       return { ...s, error: { code: e.code, message: e.message } };
     case "done":
-      return { ...s, balanceMicros: e.balanceMicros, lastTurnCostMicros: e.turnCostMicros };
+      // The turn is over for the player (the server may still be tidying up, e.g. compacting).
+      return { ...s, busy: false, balanceMicros: e.balanceMicros, lastTurnCostMicros: e.turnCostMicros };
   }
 }
 
@@ -173,6 +176,8 @@ export function useStorySession(campaignId: string) {
     async (input: TurnInput) => {
       if (busyRef.current) return;
       busyRef.current = true;
+      const myTurn = ++turnSeq;
+      let turnDone = false;
       const playerLine: FeedLine | null =
         input.type === "text" || input.type === "choice" ? { id: nextId++, kind: "player", speaker: "player", text: input.text } : null;
       setState((s) => ({
@@ -213,22 +218,31 @@ export function useStorySession(campaignId: string) {
             for (const line of chunk.split("\n")) {
               if (!line.startsWith("data: ")) continue;
               const event = JSON.parse(line.slice(6)) as TableEvent;
+              if (event.type === "done") {
+                // The turn is over for the player. The stream may stay open while the
+                // server compacts a long history; the next turn can start meanwhile.
+                turnDone = true;
+                if (turnSeq === myTurn) busyRef.current = false;
+              }
               if (event.type === "dice" && event.by === "player") {
                 setState((s) => reduceEvent({ ...s, lines: [...s.lines, { id: nextId++, kind: "dice", speaker: "player", text: `${event.label}: ${event.roll.total}${event.outcome ? ` (${event.outcome})` : ""}` }] }, event));
-              } else {
+              } else if (!(turnDone && event.type !== "done" && turnSeq !== myTurn)) {
                 setState((s) => reduceEvent(s, event));
               }
             }
           }
         }
       } catch (err) {
-        if ((err as Error).name !== "AbortError") {
+        // A drop after "done" (e.g. during compaction) isn't something the player needs to see.
+        if ((err as Error).name !== "AbortError" && !turnDone) {
           setState((s) => ({ ...s, error: { code: "network", message: "Connection lost. Your progress is saved; reload to continue." } }));
         }
       } finally {
-        busyRef.current = false;
-        abortRef.current = null;
-        setState((s) => reduceEvent({ ...s, busy: false }, { type: "speech.end" }));
+        if (turnSeq === myTurn) {
+          busyRef.current = false;
+          abortRef.current = null;
+          setState((s) => reduceEvent({ ...s, busy: false }, { type: "speech.end" }));
+        }
       }
     },
     [campaignId],

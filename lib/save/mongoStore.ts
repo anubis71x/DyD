@@ -41,11 +41,16 @@ const playSessionSchema = new mongoose.Schema(
     lastActiveAt: { type: Date, required: true },
     endedAt: { type: Date },
     recappedAt: { type: Date },
+    partNo: { type: Number },
+    earlierLines: { type: [mongoose.Schema.Types.Mixed], default: undefined },
+    carry: { type: mongoose.Schema.Types.Mixed },
+    lastPromptTokens: { type: Number },
     usage: { type: mongoose.Schema.Types.Mixed },
   },
   { versionKey: false, minimize: false },
 );
 playSessionSchema.index({ ownerId: 1, campaignId: 1, sessionNo: -1 });
+playSessionSchema.index({ endedAt: 1, lastActiveAt: 1 });
 
 /* Money. Balances are a cache of the ledger: `scripts/billing.ts reconcile`
  * recomputes them from ledger entries if a crash ever left them out of step. */
@@ -92,6 +97,10 @@ const toSession = (d: Record<string, any>): PlaySession => ({
   lastActiveAt: new Date(d.lastActiveAt).toISOString(),
   ...(d.endedAt ? { endedAt: new Date(d.endedAt).toISOString() } : {}),
   ...(d.recappedAt ? { recappedAt: new Date(d.recappedAt).toISOString() } : {}),
+  ...(d.partNo ? { partNo: d.partNo } : {}),
+  ...(d.earlierLines ? { earlierLines: d.earlierLines } : {}),
+  ...(d.carry ? { carry: d.carry } : {}),
+  ...(d.lastPromptTokens !== undefined && d.lastPromptTokens !== null ? { lastPromptTokens: d.lastPromptTokens } : {}),
   ...(d.usage ? { usage: d.usage } : {}),
 });
 
@@ -150,6 +159,13 @@ const mongoStores: Stores = {
     async count(ownerId, campaignId) {
       return PlaySessionModel.countDocuments({ ownerId, campaignId });
     },
+    async listIdle(before, limit) {
+      const docs = await PlaySessionModel.find({ endedAt: { $exists: false }, lastActiveAt: { $lt: new Date(before) } })
+        .sort({ lastActiveAt: 1 })
+        .limit(limit)
+        .lean<Record<string, any>[]>();
+      return docs.map(toSession);
+    },
     async create(s) {
       await PlaySessionModel.create({
         _id: s.sessionId,
@@ -168,6 +184,7 @@ const mongoStores: Stores = {
       if (patch.endedAt) $set.endedAt = new Date(patch.endedAt);
       if (patch.usage) $set.usage = patch.usage;
       if (patch.recappedAt) $set.recappedAt = new Date(patch.recappedAt);
+      for (const k of ["partNo", "earlierLines", "carry", "lastPromptTokens"] as const) if (patch[k] !== undefined) $set[k] = patch[k];
       await PlaySessionModel.updateOne({ _id: sessionId, ownerId }, { $set });
     },
   },

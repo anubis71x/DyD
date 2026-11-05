@@ -55,6 +55,13 @@ export function createMemoryStores(initialBalances: Record<string, number> = {})
       async create(session) {
         sessions.set(session.sessionId, clone(session));
       },
+      async listIdle(before, limit) {
+        return Array.from(sessions.values())
+          .filter((s) => !s.endedAt && s.lastActiveAt < before)
+          .sort((a, b) => a.lastActiveAt.localeCompare(b.lastActiveAt))
+          .slice(0, limit)
+          .map(clone);
+      },
       async update(ownerId, sessionId, patch) {
         const s = sessions.get(sessionId);
         if (s && s.ownerId === ownerId) sessions.set(sessionId, { ...s, ...clone(patch) });

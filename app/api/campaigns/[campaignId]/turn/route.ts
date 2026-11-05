@@ -3,13 +3,14 @@ import { z } from "zod";
 import { handle, HttpError, requireUser } from "@/lib/api/http";
 import { getMongoStores } from "@/lib/save/mongoStore";
 import { loadCampaign } from "@/lib/save/service";
-import { campaignLockKey, CAMPAIGN_LOCK_TTL_MS, getClient } from "@/lib/storyteller/client";
+import { acquireCampaignLock, campaignLockKey, getClient } from "@/lib/storyteller/client";
 import { runTurn } from "@/lib/storyteller/engine";
 import type { TableEvent, TurnInput } from "@/lib/storyteller/events";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 120;
+// A turn plus the compaction that may follow it (and up to 30 s waiting for the lock).
+export const maxDuration = 140;
 
 const Input = z.discriminatedUnion("type", [
   z.object({ type: z.literal("begin") }),
@@ -36,7 +37,7 @@ export const POST = handle("turn_POST", async (req: NextRequest, { params }: { p
 
   // One turn per campaign at a time, across all server instances.
   const key = campaignLockKey(userId, params.campaignId);
-  const lock = await stores.locks.acquire(key, CAMPAIGN_LOCK_TTL_MS);
+  const lock = await acquireCampaignLock(stores.locks, key);
   if (!lock) throw new HttpError(409, "The storyteller is still answering your last move.");
 
   const encoder = new TextEncoder();

@@ -3,7 +3,7 @@ import { authMiddleware } from '@clerk/nextjs';
 // API routes require a signed-in user. Add a route here only if it verifies
 // its caller another way (e.g. a signed Stripe webhook).
 export default authMiddleware({
-  publicRoutes: ['/', '/api/stripe/webhook'],
+  publicRoutes: ['/', '/api/stripe/webhook', '/api/cron/close-sessions'],
 });
 
 export const config = {

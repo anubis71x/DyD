@@ -31,11 +31,27 @@ Environment (`.env.local`):
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | Clerk auth |
 | `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret of the Stripe webhook endpoint (see Billing) |
+| `CRON_SECRET` | Shared secret for the scheduled idle-session job (see Sessions) |
 | `ANTHROPIC_API_KEY` | Claude API key for the storyteller |
 
 The old `NEXT_PUBLIC_VAPI_*` and `TRIEVE_*` variables are no longer used and can be deleted.
 
 Players choose the storyteller's model per campaign and can switch during play: Claude Haiku 5.5 (default), Sonnet 5.5 or Opus 5.5. Models and effort levels are set in `lib/storyteller/models.ts`.
+
+## 📖 Sessions, compaction and recaps
+
+- **Everything saves as it happens.** The save file (character, quests, characters met, world) is updated the moment the storyteller changes it. The player's message is stored before the model is called, every reply is stored as soon as it completes, and a reply cut off mid-stream is kept and marked as interrupted. A dice roll is kept even if the turn fails, so it can't be re-rolled.
+- **Long sessions are compacted, not split.** When the prompt the API reports passes ~60K tokens, the history is summarized (Claude Haiku 5.5) right after that turn and play continues in a fresh *part* of the same session, from the summary plus exactly where the scene stopped. This keeps turns fast and every prompt under Haiku's 100K-token price step. The feed still shows the whole session.
+- **One journal entry per session**, written when it really ends: the player's End session button, or 6 hours without activity. It covers every part.
+- **Abandoned sessions** are closed by a scheduled job, so returning players always get a "previously on…". Call it every 30-60 minutes, either as an HTTP cron (Vercel Cron sends the header automatically when `CRON_SECRET` is set):
+  ```bash
+  curl -H "Authorization: Bearer $CRON_SECRET" https://<your-domain>/api/cron/close-sessions
+  ```
+  or as a script on a self-hosted server:
+  ```bash
+  yarn sessions:close-idle
+  ```
+- **Hosting note:** a turn keeps running if the player's browser disconnects, and compaction runs after the reply has been sent. On a long-running Node server this works as is. On serverless hosts, make sure functions aren't stopped when the client disconnects (e.g. Vercel's `waitUntil`); if one is stopped, everything up to the last completed step is still saved and an unfinished compaction is retried on the next turn.
 
 ## 💳 Billing
 
@@ -45,7 +61,8 @@ Players keep a prepaid dollar balance and pay what each turn actually costs us, 
 - **Ledger:** every grant, top-up, hold, release and charge is a row in the `ledger` collection with a unique reference, so nothing is applied twice. `wallets` holds the current balance as a cache of the ledger.
 - **Top-ups:** $5 minimum (presets $5 / $10 / $20 / $50, up to $500). The balance is credited only by the Stripe webhook after Stripe confirms the payment.
 - **New players** get $2.50 of free credit once.
-- **Recaps** at the end of each session run on Claude Haiku 5.5 and are charged the same way (typically a fraction of a cent).
+- **Recaps and compactions** run on Claude Haiku 5.5 and are charged the same way (typically a fraction of a cent).
+- **Each completed model call is charged as it finishes**, so a crash later in the turn can't lose a charge.
 - **Safety:** a hold left by a crashed turn is released automatically after 15 minutes.
 
 Setup and operations:
@@ -83,6 +100,7 @@ All routes require a signed-in Clerk user, and every read or write is scoped to 
 | `PATCH /api/campaigns/[id]` | Switch the storyteller's model `{ modelId }` |
 | `DELETE /api/campaigns/[id]` | Delete a campaign |
 | `POST /api/campaigns/[id]/session/end` | End the current session and write its recap |
+| `GET /api/cron/close-sessions` | Scheduled job: close idle sessions (needs `Authorization: Bearer $CRON_SECRET`) |
 | `POST /api/campaigns/[id]/turn` | Play a turn (`begin`, `text`, `choice` or `roll`); streams table events as server-sent events |
 | `GET /api/campaigns/[id]/export` | Download the `.dydsave` file |
 | `POST /api/campaigns/import` | Upload a `.dydsave` file (raw body) |

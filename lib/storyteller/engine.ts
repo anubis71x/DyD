@@ -17,22 +17,23 @@ import { checkOutcome, describeRoll, DiceError, parseNotation, roll } from "./di
 import type { TableEvent, TurnInput } from "./events";
 import { getModel, type StorytellerModel } from "./models";
 import { buildSystemPrompt, sessionOpening } from "./prompt";
-import { hasStory, RECAP_MODEL, summarizeSession } from "./recap";
+import { hasStory, RECAP_MODEL, sessionLines, summarizeSession } from "./recap";
 import { SayParser } from "./sayParser";
 import { getStoryteller } from "./storytellers";
 import { runTool, TOOL_PARAMS } from "./tools";
+import { transcriptFromMessages } from "./transcript";
 
 export const ENGINE_CONFIG = {
   maxTokens: 16000,
   maxToolRounds: 8,
-  /** A session idle this long is closed (with a recap) and the next turn starts a new one. */
+  /** A session idle this long is closed with a journal recap; the next turn starts a new session. */
   sessionIdleMs: 6 * 60 * 60 * 1000,
   /**
-   * A session whose history passes this many (estimated) tokens is closed with
-   * a recap and continued in a fresh session. Keeps turns fast and every prompt
-   * well under Haiku 5.5's 100K-token price step.
+   * When a part's prompt passes this many tokens, it is compacted: summarized
+   * and continued in a fresh part of the same session. Keeps turns fast and
+   * every prompt well under Haiku 5.5's 100K-token price step.
    */
-  rolloverTokens: 60_000,
+  compactAtTokens: 60_000,
   /** Holds older than this were left by a crashed turn and are released. */
   staleHoldMs: 15 * 60 * 1000,
 };
@@ -54,6 +55,7 @@ export interface TurnDeps {
   rng?: (sides: number) => number;
   signal?: AbortSignal;
 }
+type SessionDeps = Pick<TurnDeps, "stores" | "client" | "emit">;
 
 const EMPTY_USAGE: SessionUsage = {
   turns: 0,
@@ -67,35 +69,42 @@ const EMPTY_USAGE: SessionUsage = {
 };
 
 const asMessages = (m: unknown[]) => m as BetaMessageParam[];
+const sumMicros = (lines: CostLine[]) => lines.reduce((sum, l) => sum + l.micros, 0);
+
+/** Charge a summary call (recap or compaction) at cost + markup. Idempotent on refId. */
+async function chargeSummary(stores: Stores, ownerId: string, refId: string, costLines: CostLine[], meta: Record<string, unknown>) {
+  const providerMicros = sumMicros(costLines);
+  const charge = withMarkup(providerMicros);
+  if (charge > 0) {
+    await stores.wallet.post({
+      refId,
+      userId: ownerId,
+      amountMicros: -charge,
+      kind: "charge",
+      meta: { ...meta, model: RECAP_MODEL, providerMicros, markup: MARKUP, lines: costLines },
+    });
+  }
+}
+
+/* ------------------------------------------------------------ sessions */
 
 /**
- * End a session: write its recap to the save file (charged like a turn, at
- * cost + markup) and mark it ended. A failed recap doesn't block anything;
- * the session still ends.
+ * End a session: write its journal recap (covering every part) to the save
+ * file and mark it ended. A failed recap doesn't block anything; the session
+ * still ends.
  */
-export async function closeSession(
-  ownerId: string,
-  campaignId: string,
-  session: PlaySession,
-  deps: Pick<TurnDeps, "stores" | "client" | "emit">,
-): Promise<void> {
+export async function closeSession(ownerId: string, campaignId: string, session: PlaySession, deps: SessionDeps): Promise<void> {
   const { stores, emit } = deps;
   const now = new Date().toISOString();
-  if (!session.recappedAt && hasStory(session.messages)) {
+  const lines = sessionLines(session);
+  if (!session.recappedAt && hasStory(lines)) {
     try {
       const save = await loadCampaign(stores, ownerId, campaignId);
-      const { event, costLines } = await summarizeSession(deps.client, save, session.sessionNo, session.messages, now);
-      const providerMicros = costLines.reduce((sum, l) => sum + l.micros, 0);
-      const charge = withMarkup(providerMicros);
-      if (charge > 0) {
-        await stores.wallet.post({
-          refId: `recap:${session.sessionId}`,
-          userId: ownerId,
-          amountMicros: -charge,
-          kind: "charge",
-          meta: { campaignId, sessionId: session.sessionId, purpose: "recap", model: RECAP_MODEL, providerMicros, markup: MARKUP, lines: costLines },
-        });
-      }
+      const { event, costLines } = await summarizeSession(deps.client, save, session.sessionNo, lines, now, {
+        scope: "session",
+        ...(session.carry ? { earlierSummary: session.carry.summary } : {}),
+      });
+      await chargeSummary(stores, ownerId, `recap:${session.sessionId}`, costLines, { campaignId, sessionId: session.sessionId, purpose: "recap" });
       if (event) {
         await commitEvents(stores, ownerId, campaignId, [event], "system");
         await stores.sessions.update(ownerId, session.sessionId, { recappedAt: now });
@@ -109,22 +118,70 @@ export async function closeSession(
 }
 
 /** End the active session on request (the player chose "End session"). */
-export async function endSession(ownerId: string, campaignId: string, deps: Pick<TurnDeps, "stores" | "client" | "emit">): Promise<boolean> {
+export async function endSession(ownerId: string, campaignId: string, deps: SessionDeps): Promise<boolean> {
   const latest = await deps.stores.sessions.latest(ownerId, campaignId);
   if (!latest || latest.endedAt) return false;
   await closeSession(ownerId, campaignId, latest, deps);
   return true;
 }
 
+/** Prompt size of the current part: the API's own number when we have it. */
+function promptTokens(session: PlaySession): number {
+  return session.lastPromptTokens ?? estimateTokens(JSON.stringify(session.messages));
+}
+
+export function needsCompaction(session: PlaySession): boolean {
+  return session.messages.length > 0 && promptTokens(session) > ENGINE_CONFIG.compactAtTokens;
+}
+
+/**
+ * Compact a long session: summarize the current part, move its visible lines
+ * to `earlierLines`, and start a fresh part whose opening carries the summary.
+ * The session (and its number) continues. Returns false if the summary
+ * failed; the history is then left as is and compaction is retried later.
+ */
+export async function compactSession(ownerId: string, campaignId: string, session: PlaySession, deps: SessionDeps): Promise<boolean> {
+  const { stores } = deps;
+  const partNo = session.partNo ?? 1;
+  const partLines = transcriptFromMessages(session.messages);
+  try {
+    const save = await loadCampaign(stores, ownerId, campaignId);
+    const { carry, costLines } = await summarizeSession(deps.client, save, session.sessionNo, partLines, new Date().toISOString(), {
+      scope: "part",
+      ...(session.carry ? { earlierSummary: session.carry.summary } : {}),
+    });
+    await chargeSummary(stores, ownerId, `compact:${session.sessionId}:${partNo}`, costLines, {
+      campaignId,
+      sessionId: session.sessionId,
+      purpose: "compaction",
+    });
+    if (!carry) return false;
+    const patch = {
+      messages: [],
+      partNo: partNo + 1,
+      earlierLines: [...(session.earlierLines ?? []), ...partLines],
+      carry,
+      lastPromptTokens: 0,
+    };
+    await stores.sessions.update(ownerId, session.sessionId, patch);
+    Object.assign(session, patch);
+    return true;
+  } catch (err) {
+    console.error("[compaction] failed", err instanceof Anthropic.APIError ? err.status : "", (err as Error).message);
+    return false;
+  }
+}
+
 async function getOrStartSession(ownerId: string, campaignId: string, now: Date, deps: TurnDeps) {
   const { stores } = deps;
   const latest = await stores.sessions.latest(ownerId, campaignId);
-  let continuing = false;
   if (latest && !latest.endedAt) {
     const idle = now.getTime() - new Date(latest.lastActiveAt).getTime() >= ENGINE_CONFIG.sessionIdleMs;
-    const tooLong = estimateTokens(JSON.stringify(latest.messages)) > ENGINE_CONFIG.rolloverTokens;
-    if (!idle && !tooLong) return { session: latest, isNew: false, continuing: false };
-    continuing = tooLong && !idle;
+    if (!idle) {
+      // Normally compaction already ran after the previous turn; this catches a retry.
+      if (needsCompaction(latest)) await compactSession(ownerId, campaignId, latest, deps);
+      return latest;
+    }
     await closeSession(ownerId, campaignId, latest, deps);
   }
   const session: PlaySession = {
@@ -133,12 +190,15 @@ async function getOrStartSession(ownerId: string, campaignId: string, now: Date,
     ownerId,
     sessionNo: (await stores.sessions.count(ownerId, campaignId)) + 1,
     messages: [],
+    partNo: 1,
     startedAt: now.toISOString(),
     lastActiveAt: now.toISOString(),
   };
   await stores.sessions.create(session);
-  return { session, isNew: true, continuing };
+  return session;
 }
+
+/* ---------------------------------------------------------------- turns */
 
 /** Check the player's input before any money moves. Returns an error message or null. */
 function validateInput(input: TurnInput): string | null {
@@ -170,15 +230,25 @@ function playerContent(input: TurnInput, deps: TurnDeps): string | null {
   }
 }
 
+/** Text that streamed before a failure, without a dangling half-written tag. */
+function interruptedText(streamed: string): string | null {
+  const text = streamed.replace(/<[^>]*$/, "").trimEnd();
+  return text ? `${text}\n\n[The storyteller was interrupted here.]` : null;
+}
+
 /**
  * Run one player turn: append the player's input, then loop model → tools
  * until the storyteller hands the scene back. Every message is stored as
- * received so the history stays append-only (thinking blocks are only valid
- * in an unedited conversation).
+ * soon as it exists and exactly as received, so the history stays
+ * append-only (thinking blocks are only valid in an unedited conversation)
+ * and nothing is lost if the server dies mid-turn.
  *
  * Billing: before the turn, a worst-case amount is held from the player's
- * balance. Afterwards the hold is released and the real provider cost of the
- * calls that completed, plus MARKUP, is charged.
+ * balance. Each completed model call is charged as it finishes (cost +
+ * MARKUP), and the hold is released at the end.
+ *
+ * If the turn leaves the history long, it is compacted afterwards, after
+ * the "done" event, so the player isn't kept waiting.
  */
 export async function runTurn(ownerId: string, campaignId: string, input: TurnInput, deps: TurnDeps): Promise<void> {
   const { stores, client, emit } = deps;
@@ -196,21 +266,20 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
   // Money left in holds by a turn that crashed goes back to the player first.
   await stores.wallet.releaseStaleHolds(ownerId, ENGINE_CONFIG.staleHoldMs);
 
-  const { session, isNew, continuing } = await getOrStartSession(ownerId, campaignId, new Date(), deps);
-  if (isNew) save = await loadCampaign(stores, ownerId, campaignId); // may now include the last recap
-  if (!isNew && input.type === "begin") {
-    // "begin" on a session already in progress: nothing to send.
+  const session = await getOrStartSession(ownerId, campaignId, new Date(), deps);
+  const messages = asMessages(session.messages);
+  if (messages.length > 0 && input.type === "begin") {
+    // "begin" on a part already under way: nothing to send.
     emit({ type: "done", balanceMicros: await stores.wallet.balance(ownerId), turnCostMicros: 0 });
     return;
   }
-
-  const messages = asMessages(session.messages);
-  const opening = isNew ? sessionOpening(save, session.sessionNo, { continuing }) : "";
+  save = await loadCampaign(stores, ownerId, campaignId); // may include a recap written just now
+  const opening = messages.length === 0 ? sessionOpening(save, session.sessionNo, session.carry ? { carry: session.carry } : {}) : "";
 
   // Hold enough for a long turn before anything is sent or rolled.
   const turnId = randomUUID();
-  const promptTokens = estimateTokens(systemPrompt + JSON.stringify(TOOL_PARAMS) + JSON.stringify(messages) + opening) + 600;
-  const hold = holdMicros(model.apiModel, promptTokens);
+  const estPrompt = (session.lastPromptTokens || estimateTokens(systemPrompt + JSON.stringify(TOOL_PARAMS) + JSON.stringify(messages))) + estimateTokens(opening) + 600;
+  const hold = holdMicros(model.apiModel, estPrompt);
   const held = await stores.wallet.post({
     refId: `turn:${turnId}:hold`,
     userId: ownerId,
@@ -230,24 +299,32 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
     return;
   }
 
+  const usage = { ...(session.usage ?? {}) };
+  const persist = () =>
+    stores.sessions.update(ownerId, session.sessionId, {
+      messages,
+      usage,
+      ...(session.lastPromptTokens !== undefined ? { lastPromptTokens: session.lastPromptTokens } : {}),
+      lastActiveAt: new Date().toISOString(),
+    });
+
+  // The player's input is saved before the model is called.
   const content: BetaContentBlockParam[] = [];
   if (opening) content.push({ type: "text", text: opening });
   const playerText = playerContent(input, deps);
   if (playerText) content.push({ type: "text", text: playerText });
   messages.push({ role: "user", content });
+  await persist();
   emit({ type: "turn.start", sessionNo: session.sessionNo });
 
-  // Cost of every completed API call this turn.
-  const costLines: CostLine[] = [];
-  const usage = { ...(session.usage ?? {}) };
-  const persist = () =>
-    stores.sessions.update(ownerId, session.sessionId, { messages, usage, lastActiveAt: new Date().toISOString() });
-
+  let charged = 0;
+  let calls = 0;
   let produced = false;
   let failure: unknown = null;
   try {
     for (let round = 0; round < ENGINE_CONFIG.maxToolRounds; round++) {
       const parser = new SayParser();
+      let streamed = "";
       const forward = (pieces: ReturnType<SayParser["push"]>) => {
         for (const p of pieces) emit({ type: "speech", speaker: p.speaker, ...(p.mood ? { mood: p.mood } : {}), text: p.text });
       };
@@ -265,6 +342,7 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
       );
       stream.on("text", (delta) => {
         produced = true;
+        streamed += delta;
         forward(parser.push(delta));
       });
 
@@ -274,12 +352,32 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
       } catch (err) {
         // A tool input that could not be parsed at all: re-issue the round once.
         if (!(err instanceof Anthropic.APIError) && round === 0 && !produced) continue;
+        // Keep what the player already saw, marked as interrupted.
+        const partial = interruptedText(streamed);
+        if (partial) {
+          forward(parser.flush());
+          emit({ type: "speech.end" });
+          messages.push({ role: "assistant", content: [{ type: "text", text: partial }] });
+        }
         throw err;
       }
       forward(parser.flush());
       emit({ type: "speech.end" });
 
-      costLines.push(...responseCost(model.apiModel, message.usage));
+      // Charge this call now, so a crash later in the turn can't lose it.
+      calls++;
+      const costLines = responseCost(model.apiModel, message.usage);
+      const callCharge = withMarkup(sumMicros(costLines));
+      if (callCharge > 0) {
+        await stores.wallet.post({
+          refId: `turn:${turnId}:charge:${round}`,
+          userId: ownerId,
+          amountMicros: -callCharge,
+          kind: "charge",
+          meta: { campaignId, sessionId: session.sessionId, model: model.apiModel, providerMicros: sumMicros(costLines), markup: MARKUP, lines: costLines },
+        });
+        charged += callCharge;
+      }
       const u = usage[model.id] ?? EMPTY_USAGE;
       usage[model.id] = {
         ...u,
@@ -288,7 +386,11 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
         outputTokens: u.outputTokens + message.usage.output_tokens,
         cacheReadTokens: u.cacheReadTokens + (message.usage.cache_read_input_tokens ?? 0),
         cacheWriteTokens: u.cacheWriteTokens + (message.usage.cache_creation_input_tokens ?? 0),
+        providerMicros: u.providerMicros + sumMicros(costLines),
+        chargedMicros: u.chargedMicros + callCharge,
       };
+      session.lastPromptTokens =
+        message.usage.input_tokens + (message.usage.cache_read_input_tokens ?? 0) + (message.usage.cache_creation_input_tokens ?? 0);
       messages.push({ role: "assistant", content: message.content });
       await persist();
       produced = true;
@@ -342,37 +444,16 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
     }
   } catch (err) {
     failure = err;
-    // Keep the stored history valid: drop a trailing user message the model never answered.
-    if (!produced && messages[messages.length - 1]?.role === "user") messages.pop();
+    // Nothing came back at all: drop typed input so the player can resend it
+    // as is. A dice roll stays: it was really rolled.
+    if (!produced && input.type !== "roll" && messages[messages.length - 1]?.role === "user") messages.pop();
   }
 
-  // Settle: release the hold, charge what the completed calls cost plus markup.
-  const providerMicros = costLines.reduce((sum, l) => sum + l.micros, 0);
-  const charge = withMarkup(providerMicros);
   await stores.wallet.post({ refId: `turn:${turnId}:release`, userId: ownerId, amountMicros: hold, kind: "release", meta: { campaignId } });
-  if (charge > 0) {
-    await stores.wallet.post({
-      refId: `turn:${turnId}:charge`,
-      userId: ownerId,
-      amountMicros: -charge,
-      kind: "charge",
-      meta: {
-        campaignId,
-        sessionId: session.sessionId,
-        model: model.apiModel,
-        providerMicros,
-        markup: MARKUP,
-        lines: costLines,
-      },
-    });
+  if (calls) {
+    const u = usage[model.id] ?? EMPTY_USAGE;
+    usage[model.id] = { ...u, turns: u.turns + 1 };
   }
-  const u = usage[model.id] ?? EMPTY_USAGE;
-  usage[model.id] = {
-    ...u,
-    turns: u.turns + (costLines.length ? 1 : 0),
-    providerMicros: u.providerMicros + providerMicros,
-    chargedMicros: u.chargedMicros + charge,
-  };
   await persist();
 
   if (failure) {
@@ -381,7 +462,7 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
       emit({
         type: "error",
         code: "upstream",
-        message: produced ? "The storyteller stopped partway. What was said is saved." : "The storyteller is unavailable right now. You weren't charged.",
+        message: produced ? "The storyteller was interrupted. What was said is saved." : "The storyteller is unavailable right now. You weren't charged.",
       });
       console.error("[storyteller] API error", err instanceof Anthropic.APIError ? err.status : "", err.message);
     } else {
@@ -389,5 +470,8 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
     }
   }
 
-  emit({ type: "done", balanceMicros: await stores.wallet.balance(ownerId), turnCostMicros: charge });
+  emit({ type: "done", balanceMicros: await stores.wallet.balance(ownerId), turnCostMicros: charged });
+
+  // The player has the reply; condense the history now if it got long.
+  if (!failure && needsCompaction(session)) await compactSession(ownerId, campaignId, session, deps);
 }

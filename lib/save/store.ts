@@ -1,3 +1,4 @@
+import type { TranscriptLine } from "@/lib/storyteller/events";
 import type { SaveEvent, SaveFile } from "./schema";
 
 /**
@@ -26,13 +27,26 @@ export interface StoredEvent {
   at: string;
 }
 
-/** Messages are stored exactly as sent/received so history stays append-only. */
+/**
+ * One sitting at the table. `messages` holds the current part's API history,
+ * stored exactly as sent/received so it stays append-only. When the history
+ * gets long it is compacted: the part is summarized into `carry`, its visible
+ * lines move to `earlierLines`, and a new part starts with empty `messages`.
+ */
 export interface PlaySession {
   sessionId: string;
   campaignId: string;
   ownerId: string;
   sessionNo: number;
   messages: unknown[];
+  /** 1 for the first part; increases with each compaction. */
+  partNo?: number;
+  /** Visible story lines from earlier parts of this session (for the feed and the final recap). */
+  earlierLines?: TranscriptLine[];
+  /** Summary of earlier parts, handed to the storyteller at the start of the current part. */
+  carry?: SessionCarry;
+  /** Real prompt size of the last model call, from the API's usage report. */
+  lastPromptTokens?: number;
   startedAt: string;
   lastActiveAt: string;
   endedAt?: string;
@@ -40,6 +54,12 @@ export interface PlaySession {
   recappedAt?: string;
   /** API usage per model for this session, to price coins from real numbers. */
   usage?: Record<string, SessionUsage>;
+}
+
+export interface SessionCarry {
+  summary: string;
+  leftOff: string;
+  openThreads: string[];
 }
 
 export interface SessionUsage {
@@ -83,7 +103,9 @@ export interface Stores {
     latest(ownerId: string, campaignId: string): Promise<PlaySession | null>;
     count(ownerId: string, campaignId: string): Promise<number>;
     create(session: PlaySession): Promise<void>;
-    update(ownerId: string, sessionId: string, patch: Partial<Pick<PlaySession, "messages" | "lastActiveAt" | "endedAt" | "recappedAt" | "usage">>): Promise<void>;
+    /** Open sessions (any owner) with no activity since `before`, oldest first. For the idle-session job. */
+    listIdle(before: string, limit: number): Promise<PlaySession[]>;
+    update(ownerId: string, sessionId: string, patch: Partial<Pick<PlaySession, "messages" | "lastActiveAt" | "endedAt" | "recappedAt" | "usage" | "partNo" | "earlierLines" | "carry" | "lastPromptTokens">>): Promise<void>;
   };
   wallet: {
     /** Current balance in micro-dollars (0 if the user has no wallet yet). */
