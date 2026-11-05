@@ -90,7 +90,7 @@ const FEATURES = [
   { icon: Dices, title: "Fair dice", body: "Rolls happen on our servers, not in your browser or the AI's imagination, and the storyteller narrates from the real result." },
   { icon: BookOpen, title: "Any setting", body: "Dark fantasy, fairy tale, cozy tavern or tactical war story. Rules are compatible with fifth edition, from the open SRD." },
   { icon: Languages, title: "In your language", body: "Play in English, Español, 日本語 and many more. Just start talking in the language you want." },
-  { icon: Mic, title: "Voice play returns soon", body: "Talk to your storyteller and hear every character in their own voice. Voice is paused while we move to our new storyteller; text play works today." },
+  { icon: Mic, title: "Voice and text together", body: "Talk or type, read along or listen. Every reply appears on screen and is spoken aloud, and you can mute audio anytime. Talking to your storyteller and full character voices are returning after maintenance; replies use your device's voices meanwhile." },
 ];
 
 export default function LandingPage() {
@@ -232,7 +232,7 @@ export default function LandingPage() {
               {[
                 ["Is this Dungeons & Dragons?", "Dreampool isn't affiliated with Wizards of the Coast. Its rules are compatible with fifth edition, based on the openly licensed SRD, and it works with any setting you like."],
                 ["Can I play with friends?", "Not yet. Dreampool is built for one player at a time today. Playing together is on our roadmap."],
-                ["Can I talk instead of type?", "Voice play is paused for maintenance while we move to our new storyteller. Text play works now, and voice will return with a distinct voice for every character."],
+                ["Do I talk or type?", "Both. Play is voice and text together: every reply is on screen and read aloud, and you can mute audio whenever you like. Talking to your storyteller is paused for maintenance right now, so type for the moment; replies are read aloud with your device's voices until full character voices return."],
                 ["What happens to my story?", "It's saved as you play: your character, quests, the people you've met and a journal entry for every session. You can download your save file and import it again later."],
                 ["How much does it cost?", `Each turn is charged at what it costs us to run plus ${Math.round(MARKUP * 100)}%. On the default model that's a fraction of a cent. You start with ${formatUsd(SIGNUP_CREDIT_MICROS)} free and add funds from $${MIN_TOPUP_CENTS / 100} when you need more.`],
               ].map(([q, a]) => (

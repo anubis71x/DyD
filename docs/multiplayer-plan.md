@@ -4,7 +4,7 @@ Status: **Draft for review** · Date: 2026-11-05 · Builds on `docs/modernizatio
 
 ## 1. Goal
 
-Two to five players share one campaign at the same table, in real time, with one storyteller. Each player has their own character. Players can join by invite link, drop in and out between sessions, and play by text or (once voice returns) by voice. Solo play stays exactly as it is.
+Two to five players share one campaign at the same table, in real time, with one storyteller. Each player has their own character. Players can join by invite link, drop in and out between sessions, and play with voice and text together, as in solo play. Solo play stays exactly as it is.
 
 **Out of scope for the first version:** public matchmaking, spectators, more than five players, players controlling the same character, and asynchronous "play-by-post" campaigns.
 
@@ -92,7 +92,7 @@ Recommendation: **host pays** for v1. If someone else runs out of funds nothing 
 - Each player's microphone is its own track; speech-to-text runs per track, so lines arrive already attributed.
 - Gathering uses voice activity: the window closes when everyone has been quiet briefly.
 - Barge-in: any player can interrupt the storyteller.
-- Text and voice players can share a table.
+- Every seat is voice and text together; players who mute audio or their mic still read and type along.
 
 ## 4. UI
 

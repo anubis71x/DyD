@@ -33,7 +33,7 @@ const steps: Step[] = [
     },
     {
         title: "Play",
-        description: "Type what you do or say, or tap a suggested action. Roll dice when the storyteller asks. Turn on Read aloud to hear replies in your device's voices. Everything saves as you go, and you start with $2.50 of free credit.",
+        description: "Say or type what you do, or tap a suggested action. Every reply is on screen and read aloud; tap the speaker to mute. Roll dice when the storyteller asks. Everything saves as you go, and you start with $2.50 of free credit.",
         image: "/tutorial/step-3.jpg",
     },
 ]

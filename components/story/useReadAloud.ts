@@ -10,8 +10,9 @@ import { UtteranceSegmenter } from "@/lib/voice/segmenter";
 const STORAGE_KEY = "dreampool.readAloud";
 
 /**
- * Reads the storyteller's replies aloud with the device's voices while the
- * real voice pipeline is paused. Feed it streamed table events via `onEvent`;
+ * The audio half of play: reads the storyteller's replies aloud with the
+ * device's voices while the real voice pipeline is paused. On by default;
+ * the player can mute it (remembered per device). Feed it streamed table events via `onEvent`;
  * call `stop()` when the player acts (they've moved on).
  */
 export function useReadAloud() {
@@ -29,12 +30,13 @@ export function useReadAloud() {
     speakerRef.current = new BrowserSpeaker({ lang: "en", onSpeaking: setSpeaking });
     // Some browsers load their voice list asynchronously.
     window.speechSynthesis.getVoices();
+    // Play is voice and text together: audio is on unless the player muted it.
+    let muted = false;
     try {
-      if (localStorage.getItem(STORAGE_KEY) === "on") {
-        enabledRef.current = true;
-        setEnabled(true);
-      }
+      muted = localStorage.getItem(STORAGE_KEY) === "off";
     } catch {}
+    enabledRef.current = !muted;
+    setEnabled(!muted);
     return () => window.speechSynthesis.cancel();
   }, []);
 

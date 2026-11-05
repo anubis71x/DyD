@@ -4,7 +4,7 @@
 
 DyD (Dreampool) is a solo tabletop roleplaying app. The player picks a storyteller, and an AI storyteller runs the game: it narrates, voices the characters, rolls dice and keeps a structured save file of the character, quests, characters met and the world.
 
-> **Status:** Vapi has been removed. Voice play is paused for maintenance while the new voice pipeline is built (see `docs/modernization-plan.md`). Every campaign can be played by text in the meantime.
+> **Status:** Vapi has been removed. Play is always voice and text together (audio can be muted). Talking to the storyteller is paused for maintenance while the new voice pipeline is built (see `docs/modernization-plan.md`); replies are read aloud with the device's voices meanwhile, and every campaign can be played by typing in the meantime.
 
 Access the platform at: **[https://www.dreampool.ai/](https://www.dreampool.ai/)**
 

@@ -50,7 +50,7 @@ function StorytellerCard({ st, selected, onSelect }: { st: Storyteller; selected
             <p className="w-full border-l-2 border-[color:var(--accent)] pl-3 font-[family-name:var(--font-display)] text-base italic text-zinc-200">
               “{st.sampleLine}”
               <span className="mt-1 block font-sans text-[11px] not-italic text-zinc-500">
-                Narrated in {VOICE_BY_ID.get(st.narrationVoiceId)?.label}. Audio samples return with voice play.
+                Narrated in {VOICE_BY_ID.get(st.narrationVoiceId)?.label}. Audio samples return with full voices.
               </span>
             </p>
           )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquarePlus, ThumbsDown, ThumbsUp } from "lucide-react";
+import { MessageSquarePlus, Mic, ThumbsDown, ThumbsUp, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -170,88 +170,78 @@ function InputPanel({ state, send, readAloud }: { state: StoryState; send: (i: T
   const speakerName =
     state.speaker === "narrator" ? st.name : state.save!.npcs.find((n) => n.id === state.speaker)?.name ?? state.speaker;
   return (
-    <section aria-label="Your turn" className="mx-3 mb-3 grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl border border-white/10 bg-[#151a22] p-3 sm:mx-6 md:grid-cols-[auto_1fr_auto]">
-      <button
-        type="button"
-        disabled
-        title="Voice play is paused for maintenance"
-        aria-label="Microphone (paused for maintenance)"
-        className="grid h-14 w-14 place-items-center rounded-full bg-white/5 text-zinc-600"
-      >
-        <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <rect x="9" y="3" width="6" height="11" rx="3" />
-          <path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16" />
-        </svg>
-      </button>
-      <div className="flex min-w-0 flex-col gap-2">
-        <p className="flex items-center gap-2 text-xs text-zinc-500">
-          <span className={`h-2 w-2 rounded-full ${state.speaker ? "bg-[color:var(--accent)] shadow-[0_0_8px_var(--accent)]" : "bg-zinc-600"}`} />
-          {state.speaker ? (
-            <span>
-              <b className="font-semibold text-zinc-200">{speakerName}</b> is speaking
-            </span>
-          ) : state.busy ? (
-            "The storyteller is working on it…"
-          ) : (
-            <span>
-              <b className="font-semibold text-zinc-200">Your turn.</b> Type what you do or say, or pick an action.
-            </span>
-          )}
-        </p>
-        <form onSubmit={submit} className="flex gap-2">
-          <label htmlFor="turn-input" className="sr-only">What do you do?</label>
-          <textarea
-            id="turn-input"
-            rows={1}
-            value={text}
-            maxLength={2000}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit();
-              }
-            }}
-            placeholder="I lean on the desk and ask about the singing…"
-            className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/10 bg-[#1c222d] px-3 py-2.5 text-zinc-100 placeholder:text-zinc-600 focus:border-[color:var(--accent)] focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={state.busy || !text.trim()}
-            className="rounded-xl bg-[color:var(--accent)] px-4 font-semibold text-[#14100b] transition hover:brightness-110 disabled:opacity-40"
-          >
-            Send
-          </button>
-        </form>
-      </div>
-      <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 md:col-span-1 md:flex-col md:items-end">
-        <div className="inline-flex rounded-full border border-white/10 bg-[#1c222d] p-0.5 text-xs" role="group" aria-label="Input mode">
-          <button type="button" disabled className="rounded-full px-3 py-1 text-zinc-600" title="Paused for maintenance">Tap to talk</button>
-          <button type="button" disabled className="rounded-full px-3 py-1 text-zinc-600" title="Paused for maintenance">Open mic</button>
-          <button type="button" aria-pressed="true" className="rounded-full bg-[#151a22] px-3 py-1 text-zinc-100 ring-1 ring-white/10">Text</button>
-        </div>
+    <section aria-label="Your turn" className="mx-3 mb-3 flex flex-col gap-2 rounded-2xl border border-white/10 bg-[#151a22] p-3 sm:mx-6">
+      <p className="flex items-center gap-2 text-xs text-zinc-500">
+        <span className={`h-2 w-2 rounded-full ${state.speaker || readAloud.speaking ? "bg-[color:var(--accent)] shadow-[0_0_8px_var(--accent)]" : "bg-zinc-600"}`} />
+        {state.speaker ? (
+          <span>
+            <b className="font-semibold text-zinc-200">{speakerName}</b> is speaking
+          </span>
+        ) : state.busy ? (
+          "The storyteller is working on it…"
+        ) : (
+          <span>
+            <b className="font-semibold text-zinc-200">Your turn.</b> Say or type what you do, or pick an action.
+          </span>
+        )}
+      </p>
+      <form onSubmit={submit} className="flex items-end gap-2">
+        {/* Voice and text work together; talking is paused while the voice service is in maintenance. */}
+        <button
+          type="button"
+          disabled
+          title="Talking to your storyteller is paused for maintenance. Type for now."
+          aria-label="Talk (paused for maintenance)"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/5 text-zinc-600"
+        >
+          <Mic className="h-5 w-5" aria-hidden="true" />
+        </button>
+        <label htmlFor="turn-input" className="sr-only">What do you do?</label>
+        <textarea
+          id="turn-input"
+          rows={1}
+          value={text}
+          maxLength={2000}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          placeholder="I lean on the desk and ask about the singing…"
+          className="min-h-[44px] min-w-0 flex-1 resize-none rounded-xl border border-white/10 bg-[#1c222d] px-3 py-2.5 text-zinc-100 placeholder:text-zinc-600 focus:border-[color:var(--accent)] focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={state.busy || !text.trim()}
+          className="h-11 shrink-0 rounded-xl bg-[color:var(--accent)] px-4 font-semibold text-[#14100b] transition hover:brightness-110 disabled:opacity-40"
+        >
+          Send
+        </button>
         {readAloud.supported && (
           <button
             type="button"
-            role="switch"
-            aria-checked={readAloud.enabled}
+            aria-pressed={readAloud.enabled}
             onClick={readAloud.toggle}
-            title="Read replies aloud with your device's built-in voices"
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition ${
-              readAloud.enabled ? "border-[color:var(--accent)] text-zinc-100" : "border-white/10 text-zinc-400 hover:text-zinc-200"
+            aria-label={readAloud.enabled ? "Mute the storyteller's voice" : "Unmute the storyteller's voice"}
+            title={readAloud.enabled ? "Audio on: tap to mute" : "Audio off: tap to hear replies"}
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border transition ${
+              readAloud.enabled ? "border-[color:var(--accent)] text-zinc-100" : "border-white/10 text-zinc-500 hover:text-zinc-200"
             }`}
           >
-            <span className={`relative h-3.5 w-6 rounded-full transition ${readAloud.enabled ? "bg-[color:var(--accent)]" : "bg-white/15"}`} aria-hidden="true">
-              <span className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-all ${readAloud.enabled ? "left-3" : "left-0.5"}`} />
-            </span>
-            Read aloud{readAloud.speaking ? " · speaking" : ""}
+            {readAloud.enabled ? <Volume2 className="h-5 w-5" aria-hidden="true" /> : <VolumeX className="h-5 w-5" aria-hidden="true" />}
           </button>
         )}
-        <span className="text-[11px] text-zinc-500">
-          {readAloud.enabled ? "Device voices · full voice play is paused for maintenance" : "Voice is paused for maintenance"} ·{" "}
-          {state.lastTurnCostMicros !== null ? `last turn ${formatUsd(state.lastTurnCostMicros)}` : perTurn(state.save!.modelId)}
-        </span>
-      </div>
+      </form>
+      <p className="text-[11px] text-zinc-500">
+        {!readAloud.supported
+          ? "This browser can't play voices; you'll see every reply as text."
+          : readAloud.enabled
+            ? "Replies are read aloud with your device's voices while full voices return."
+            : "Audio is off. Replies appear as text only."}{" "}
+        Talking is paused for maintenance · {state.lastTurnCostMicros !== null ? `last turn ${formatUsd(state.lastTurnCostMicros)}` : perTurn(state.save!.modelId)}
+      </p>
     </section>
   );
 }

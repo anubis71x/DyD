@@ -47,7 +47,7 @@ export default function CampaignsPage() {
   return (
     <div className={`${displayFont.variable} mx-auto flex max-w-7xl flex-col gap-12 px-5 pb-16`}>
       <div className="rounded-2xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-sm text-amber-100/90" role="note">
-        Voice play is paused for maintenance while we move to our new storyteller. You can play every campaign by text in the meantime.
+        Talking to your storyteller is paused for maintenance while we move to our new voices. Type as usual; replies are still read aloud with your device's voices, and you can mute them anytime.
       </div>
       {error && <p role="alert" className="text-rose-300">{error}</p>}
       {campaigns === null ? (

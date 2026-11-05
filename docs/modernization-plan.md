@@ -203,7 +203,7 @@ SaveFileV1 = {
 - **System:** move to Tailwind v4 design tokens (color, radius, elevation, motion) on top of the shadcn/ui components we already use, and remove the duplicate `tailwind.config.js`. Every screen uses the same tokens, with light mode as an option.
 - **Motion:** framer-motion, kept subtle: panels slide in, the speaker portrait glows while that voice talks, and dice roll physically. Respect `prefers-reduced-motion`.
 - **Presence:** replace the Siri waveform with an audio-reactive "presence" orb or portrait for the storyteller. It reacts to the voice that is speaking and shifts color when a cast NPC talks.
-- **Mobile first:** voice play mostly happens on phones. Side panels become bottom sheets, and controls stay within reach of a thumb.
+- **Mobile first:** play, especially talking, mostly happens on phones. Side panels become bottom sheets, and controls stay within reach of a thumb.
 - **No ads at the table.** If we keep ads, show them only on the library and store pages.
 
 ### 4.3 Information architecture
@@ -224,7 +224,7 @@ The play screen is a multi-panel table. The voice session and the screen stay in
 | Panel / feature | What it does | Driven by |
 |---|---|---|
 | **Story feed** (center) | A live transcript shown as styled prose. Each speaker gets a portrait and color; narration and dialogue look different; the line being spoken is highlighted. Players can scroll back. | Transcript + `<say>` speaker tags |
-| **Input modes** | Open mic, push-to-talk, or **text only**. Text is quiet, accessible, and cheaper: we can skip TTS and read along. Players can switch mid-session. | Client setting; agent accepts text turns |
+| **Voice and text together** | There are no modes: every turn can be spoken or typed, and every reply appears as text and is spoken. Players can mute audio (and later the mic); text is always on. Muting skips TTS, so it's also cheaper. | Client setting; agent accepts text turns |
 | **Suggested actions** | 2–4 tappable choice chips after key beats ("Bribe the guard", "Draw your blade"), plus "something else". | `ui.choices` tool |
 | **Dice** | Animated dice. The roll is done **on the server** (no client-side faking), and the storyteller narrates the result. Players can also roll themselves. | `roll_dice` tool → `ui.dice` |
 | **Character sheet** | Stats, HP and resources (with bars), inventory, abilities. Updates live when tools change them, and changed fields flash briefly. | `state.patch` events from `SaveService` |
@@ -260,7 +260,7 @@ Vapi is removed and voice play is paused. Text play runs on the new stack:
 - Sessions: long sessions are compacted into parts of the same session (summary + exactly where the scene stopped, triggered by the real prompt size past ~60K tokens, run after the turn); one journal recap per session when it ends (End session, 6 h idle, or the scheduled idle-session job). Player input, rolls and interrupted replies are saved; each model call is charged as it completes.
 - Reliability: one turn per campaign at a time via a database lock (works across server instances); holds left by a crashed turn are released automatically after 15 minutes.
 - Phase 2b (design system): one dark theme for the whole signed-in app (shared tokens, Cormorant + Figtree, calm static background), Dreampool brand mark, labeled navigation that also works on phones, a balance pill with Add funds, and a new home page with a Continue card. Landing page and admin pages still use their older styling.
-- Read aloud (device voices) while voice is paused; player feedback on lines, characters, voices and the storyteller, delivered at the next turn without interrupting the current one, with instant voice recasts.
+- Play is voice and text together: replies are read aloud with device voices (on by default, mutable) while talking is paused; player feedback on lines, characters, voices and the storyteller, delivered at the next turn without interrupting the current one, with instant voice recasts.
 - Multiplayer: planned in `docs/multiplayer-plan.md` (recommended after voice; save-file party model first).
 - Not yet: an image provider, ambience audio, voice, Next/React/Clerk upgrade (Phase 6), legacy route cleanup after migration (Phase 5).
 
