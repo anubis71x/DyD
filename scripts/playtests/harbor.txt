@@ -1,0 +1,15 @@
+# A fixed run for comparing models on the same inputs. One player line per row; lines starting with # are skipped.
+# The first lines answer character creation; the rest exercise NPCs, checks, choices, inventory and a recap.
+I want to play a half-elf smuggler called Wren, quick with a knife and quicker with excuses.
+Dexterity and charm, not much muscle. I owe money to someone dangerous.
+That's good, let's start.
+I look for the harbormaster and ask who is still sailing tonight.
+I try to slip a coin into his hand without anyone noticing.
+/roll
+/1
+I ask the stranger at the end of the pier what she's waiting for.
+I pocket whatever she drops and walk away fast.
+/roll
+I check what I'm carrying and count my coin.
+/end
+I head back to the docks before dawn.
