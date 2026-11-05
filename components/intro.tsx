@@ -19,21 +19,19 @@ interface Step {
     image?: string
 }
 
+// The old screenshots showed the Vapi call screen; add new ones (image) when the UI settles.
 const steps: Step[] = [
     {
-        title: "Start Adventure",
-        description: "Click on 'Start Adventure' to proceed to master selection.",
-        image: "https://i.ibb.co/ZzKq3fhs/Captura-de-pantalla-2025-03-25-235813.png",
+        title: "Choose your storyteller",
+        description: "Click 'Start adventure', then pick who tells your story and which model runs it. Claude Haiku 5.5 is fast and costs a fraction of a cent per turn.",
     },
     {
-        title: "Select a Master",
-        description: "Choose a master to guide your Dungeon and Dragons adventure.",
-        image: "https://i.ibb.co/5XLGjPRy/Captura-de-pantalla-2025-03-25-235852.png",
+        title: "Create your character",
+        description: "Your storyteller asks who you want to be. Answer in your own words; your character sheet fills in as you talk.",
     },
     {
-        title: "Begin Call",
-        description: "Initiate the call to commence your epic adventure.",
-        image: "https://i.ibb.co/Cp4CkNKB/parte3.png",
+        title: "Play",
+        description: "Type what you do or say, or tap a suggested action. Roll dice when the storyteller asks. Everything saves as you go, and you start with $2.50 of free credit. Voice play returns soon.",
     },
 ]
 
@@ -52,9 +50,7 @@ export function DashboardIntroModal({ open, onOpenChange }: DashboardIntroModalP
         } else {
             // Actualiza que el usuario ya vio el tutorial
             try {
-             const data=  await axios.put("/api/user", { isNewUser: false })
-             console.log(data);
-             
+             await axios.put("/api/user", { isNewUser: false })
             } catch (error) {
               console.error("Error actualizando estado del tutorial:", error)
             }
@@ -86,13 +82,15 @@ export function DashboardIntroModal({ open, onOpenChange }: DashboardIntroModalP
                     <DialogDescription>{steps[currentStep].description}</DialogDescription>
                 </DialogHeader>
 
-                                <div className="my-6">
-                    <img
-                        src={steps[currentStep].image}
-                        alt={`Step ${currentStep + 1}`}
-                        className="rounded-md w-full h-auto"
-                    />
-                </div>
+                {steps[currentStep].image && (
+                    <div className="my-6">
+                        <img
+                            src={steps[currentStep].image}
+                            alt={`Step ${currentStep + 1}`}
+                            className="rounded-md w-full h-auto"
+                        />
+                    </div>
+                )}
 
                 <div className="flex items-center justify-center gap-1 my-2">
                     {steps.map((_, index) => (

@@ -1,5 +1,4 @@
 "use client"
-import { User, ShoppingBasket } from "lucide-react"
 import { UserButton } from "@clerk/nextjs"
 import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query"
 import axios from "axios"
@@ -29,13 +28,8 @@ export function Header() {
         <QueryClientProvider client={queryClient}>
             <DashboardIntroModal open={isOpen} onOpenChange={() => setIsOpen(!isOpen)}/>
             <div className="flex justify-between items-center xl:mb-12 py-2 px-4">
-                <div className="hidden xl:flex items-center space-x-2 text-gray-400 bg-[#16171b] p-3 px-8 rounded-2xl ">
-                    <span>adventurers online:</span>
-                    <div className="flex items-center">
-                        <User size={16} className="mr-1" />
-                        <span className="font-semibold">10</span>
-                    </div>
-                </div>
+                {/* Spacer keeps the balance and profile on the right. (The old "adventurers online" count was hard-coded.) */}
+                <div className="hidden xl:block" />
 
                 <div className="flex items-center space-x-3 bg-[#16171b] p-3 px-8 rounded-2xl">
                     <div className="px-2">

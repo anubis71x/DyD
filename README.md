@@ -52,6 +52,7 @@ Players choose the storyteller's model per campaign and can switch during play: 
   ```bash
   yarn sessions:close-idle
   ```
+- **Vercel setup:** `vercel.json` schedules the job daily at 09:17 UTC. Set `CRON_SECRET` in the Vercel project's environment variables; until then the job's requests are rejected and nothing runs.
 - **Vercel Hobby limits:** functions run at most 60 seconds (all routes are set to that), and Vercel Cron runs at most once a day. The once-a-day idle-session job still works: sessions it misses are recapped when the player next plays. Each run closes up to 10 sessions. A paid plan allows longer functions and hourly crons. Note that Vercel's Hobby plan is for non-commercial use, so you'll need Pro once you take payments.
 - **Hosting note:** a turn keeps running if the player's browser disconnects, and compaction runs after the reply has been sent. On a long-running Node server this works as is. On serverless hosts, make sure functions aren't stopped when the client disconnects (e.g. Vercel's `waitUntil`); if one is stopped, everything up to the last completed step is still saved and an unfinished compaction is retried on the next turn.
 
