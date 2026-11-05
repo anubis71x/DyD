@@ -1,14 +1,9 @@
 "use client";
 
-import { Cormorant_Garamond } from "next/font/google";
 import type { CSSProperties, ReactNode } from "react";
+import { displayFont } from "@/lib/fonts";
 
-export const displayFont = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  style: ["normal", "italic"],
-  variable: "--font-display",
-});
+export { displayFont };
 
 /** Sets the storyteller accent for everything inside. */
 export function AccentScope({ color, className, children }: { color: string; className?: string; children: ReactNode }) {

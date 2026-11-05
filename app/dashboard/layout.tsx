@@ -1,52 +1,33 @@
 import type { Metadata } from "next";
-import { Inter } from 'next/font/google';
 import "@/app/globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Sidebar } from "./components/Sidebar";
+import AdSense from "@/components/AdSense";
+import { bodyFont, displayFont } from "@/lib/fonts";
 import { ToasterProvider } from "@/lib/ToasterProvider";
 import { Header } from "./components/Header";
-import { Footer } from "./components/Footer";
+import { Sidebar } from "./components/Sidebar";
 import QueryProvider from "./queryProvider";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { BackgroundEffect } from "./components/background-effect";
-import AdSense from "@/components/AdSense";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Dreampool - Dashboard",
-  description: "Dreampool - Dashboard",
+  title: "Dreampool",
+  description: "Solo tabletop adventures told by an AI storyteller.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" className="dark">
         <head>
           <AdSense />
         </head>
-        <body className={inter.className}>
+        <body className={`${bodyFont.variable} ${displayFont.variable} dp-night font-[family-name:var(--font-body)] text-foreground antialiased`}>
           <ToasterProvider />
           <QueryProvider>
-            {/* Fondo animado con temática D&D */}
-            <BackgroundEffect />
-            {/* Contenedor principal */}
-            <div className="flex max-lg:flex-col min-h-screen h-full text-grey-1 overflow-y-auto relative z-10">
+            <div className="flex min-h-screen flex-col lg:flex-row">
               <Sidebar />
-              {/* Contenedor del contenido principal */}
-              <div className="flex-1 min-h-screen h-full text-white font-sans backdrop-blur-sm bg-black/20">
-                {/* Control vertical */}
-                <div className="flex flex-col h-full">
-                  <Header />
-                  {/* Main con contenido */}
-                  <main className="flex-1 py-6 overflow-y-auto">
-                    {children}
-                  </main>
-                </div>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <Header />
+                <main className="flex-1 pb-8">{children}</main>
               </div>
             </div>
           </QueryProvider>

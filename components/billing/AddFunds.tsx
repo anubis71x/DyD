@@ -43,13 +43,13 @@ function PayForm({ amountCents, onPaid }: { amountCents: number; onPaid: () => v
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-2 text-sm font-medium text-muted-foreground">
         Card details
-        <div className="rounded-md border bg-white p-3">
-          <CardElement options={{ style: { base: { fontSize: "16px", color: "#424770", "::placeholder": { color: "#aab7c4" } }, invalid: { color: "#9e2146" } } }} />
+        <div className="rounded-md border border-border bg-secondary p-3">
+          <CardElement options={{ style: { base: { fontSize: "16px", color: "#ebe6da", iconColor: "#9ba3b1", "::placeholder": { color: "#6b7280" } }, invalid: { color: "#e07a6e", iconColor: "#e07a6e" } } }} />
         </div>
       </label>
-      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <Button type="submit" disabled={!stripe || processing} className="w-full py-6">
         {processing ? "Processing…" : `Pay ${dollars(amountCents)}`}
       </Button>
@@ -73,7 +73,7 @@ export function AddFundsDialog({ open, onClose, onFunded }: { open: boolean; onC
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="bg-white text-slate-900 sm:max-w-md">
+      <DialogContent className="border-border bg-card text-card-foreground sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-center gap-2 text-2xl font-bold">
             <Wallet className="h-6 w-6" /> Add funds
@@ -82,7 +82,7 @@ export function AddFundsDialog({ open, onClose, onFunded }: { open: boolean; onC
 
         {step === "amount" && (
           <div className="flex flex-col gap-4">
-            <p className="text-center text-sm text-slate-600">
+            <p className="text-center text-sm text-muted-foreground">
               Each turn is charged at what it costs us to run plus {Math.round(MARKUP * 100)}%. Most Haiku turns cost well under a cent.
             </p>
             <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Amount">
@@ -96,15 +96,15 @@ export function AddFundsDialog({ open, onClose, onFunded }: { open: boolean; onC
                     setCustom("");
                     setAmountCents(c);
                   }}
-                  className={`rounded-lg border py-3 text-lg font-semibold ${!custom && amountCents === c ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-900 hover:border-slate-400"}`}
+                  className={`rounded-lg border py-3 text-lg font-semibold ${!custom && amountCents === c ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-muted-foreground"}`}
                 >
                   {dollars(c)}
                 </button>
               ))}
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-600">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
               Other amount
-              <span className="flex items-center rounded-md border px-2">
+              <span className="flex items-center rounded-md border border-border bg-secondary px-2 text-foreground">
                 $
                 <input
                   type="number"
@@ -119,17 +119,17 @@ export function AddFundsDialog({ open, onClose, onFunded }: { open: boolean; onC
                 />
               </span>
             </label>
-            {!valid && <p className="text-sm text-red-600">Choose an amount between {dollars(MIN_TOPUP_CENTS)} and {dollars(MAX_TOPUP_CENTS)}.</p>}
+            {!valid && <p className="text-sm text-destructive">Choose an amount between {dollars(MIN_TOPUP_CENTS)} and {dollars(MAX_TOPUP_CENTS)}.</p>}
             <Button type="button" disabled={!valid || !stripePromise} onClick={() => setStep("pay")} className="py-6">
               Continue with {valid ? dollars(chosen) : "…"}
             </Button>
-            {!stripePromise && <p className="text-sm text-red-600">Payments aren&apos;t configured yet (missing Stripe publishable key).</p>}
+            {!stripePromise && <p className="text-sm text-destructive">Payments aren&apos;t configured yet (missing Stripe publishable key).</p>}
           </div>
         )}
 
         {step === "pay" && stripePromise && (
           <Elements stripe={stripePromise}>
-            <button type="button" onClick={() => setStep("amount")} className="mb-2 text-sm text-slate-600 hover:text-slate-900">
+            <button type="button" onClick={() => setStep("amount")} className="mb-2 text-sm text-muted-foreground hover:text-foreground">
               ← Change amount
             </button>
             <PayForm
@@ -144,7 +144,7 @@ export function AddFundsDialog({ open, onClose, onFunded }: { open: boolean; onC
 
         {step === "done" && (
           <div className="flex flex-col gap-4 text-center">
-            <p className="rounded-md border border-green-200 bg-green-50 p-4 text-green-800">
+            <p className="rounded-md border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-200">
               Payment received. {dollars(chosen)} will appear in your balance within a few seconds.
             </p>
             <Button type="button" onClick={close}>Back to the story</Button>
@@ -159,9 +159,10 @@ export function AddFundsButton({ onFunded }: { onFunded?: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="flex items-center px-3 py-2 text-sm xl:px-6 xl:py-6 xl:text-lg">
-        <Wallet className="h-5 w-5 sm:mr-2" />
+      <Button onClick={() => setOpen(true)} className="h-9 rounded-full px-4 text-sm font-semibold">
+        <Wallet className="h-4 w-4 sm:mr-1.5" aria-hidden="true" />
         <span className="hidden sm:inline">Add funds</span>
+        <span className="sr-only sm:hidden">Add funds</span>
       </Button>
       <AddFundsDialog open={open} onClose={() => setOpen(false)} onFunded={onFunded} />
     </>

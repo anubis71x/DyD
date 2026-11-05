@@ -79,7 +79,7 @@ export function StorytellerPicker({ onStart, busy }: { onStart: (storytellerId: 
   };
   const st = STORYTELLERS.find((s) => s.id === selected)!;
   return (
-    <section aria-labelledby="pick-heading" className="flex flex-col gap-5">
+    <section id="new" aria-labelledby="pick-heading" className="flex scroll-mt-6 flex-col gap-5">
       <div className="max-w-2xl">
         <h2 id="pick-heading" className="font-[family-name:var(--font-display)] text-4xl font-semibold">Who will tell your story?</h2>
         <p className="mt-2 text-zinc-400">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useStorySession, type DiceView, type FeedLine, type StoryState } from "@/hooks/use-story-session";
 import type { SaveFile } from "@/lib/save/schema";
@@ -514,6 +515,11 @@ const RAIL: { key: DrawerKey; label: string; path: string }[] = [
 export function StoryTable({ campaignId }: { campaignId: string }) {
   const { state, send, setModel, endSession, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId);
   const [fundsOpen, setFundsOpen] = useState(false);
+  // The balance lives in the app header; refresh it as soon as a turn settles.
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (state.lastTurnCostMicros !== null) void queryClient.invalidateQueries({ queryKey: ["info"] });
+  }, [state.lastTurnCostMicros, state.balanceMicros, queryClient]);
   const [drawer, setDrawer] = useState<DrawerKey | null>(null);
 
   useEffect(() => {
@@ -558,14 +564,17 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
         )}
         <span className="hidden rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-xs text-zinc-400 xl:inline">✓ Saved · rev {save.revision}</span>
         <a href={`/api/campaigns/${campaignId}/export`} className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-400 hover:text-zinc-100 md:inline">Download save</a>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-sm">
-          <span className="font-mono">{formatUsd(state.balanceMicros)}</span>
-          <button type="button" onClick={() => setFundsOpen(true)} className="ml-1 rounded-full px-1.5 text-zinc-400 hover:text-zinc-100" aria-label="Add funds">+</button>
-        </span>
         <AddFundsDialog
           open={fundsOpen}
           onClose={() => setFundsOpen(false)}
-          onFunded={() => [2000, 5000, 10000].forEach((ms) => setTimeout(() => void refreshBalance(), ms))}
+          onFunded={() =>
+            [2000, 5000, 10000].forEach((ms) =>
+              setTimeout(() => {
+                void refreshBalance();
+                void queryClient.invalidateQueries({ queryKey: ["info"] });
+              }, ms),
+            )
+          }
         />
       </header>
 
