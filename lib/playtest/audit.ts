@@ -125,6 +125,25 @@ export function auditTurn(calls: CallRecord[], before: SaveFile, save: SaveFile,
   if (names.filter((n) => n === "offer_choices").length > 1) out.push({ severity: "warn", code: "choices.multiple", detail: "offer_choices called more than once" });
   if (names.filter((n) => n === "illustrate").length > 1) out.push({ severity: "info", code: "illustrate.multiple", detail: "illustrate called more than once" });
 
+  // Narration repeated in a later call of the same turn (read aloud twice).
+  const seen = new Set<string>();
+  for (const c of calls) {
+    const mine = new Set<string>();
+    for (const b of c.content) {
+      if (b.type !== "text") continue;
+      for (const sent of (b.text ?? "").replace(/<[^>]+>/g, "").split(/(?<=[.!?…])\s+/)) {
+        const k = sent.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+        if (k.split(" ").length < 5) continue;
+        if (seen.has(k)) {
+          out.push({ severity: "warn", code: "reply.repeated", detail: clip(sent) });
+          break;
+        }
+        mine.add(k);
+      }
+    }
+    mine.forEach((k) => seen.add(k));
+  }
+
   const last = calls[calls.length - 1];
   if (last?.stopReason === "max_tokens") out.push({ severity: "error", code: "stop.max_tokens", detail: "reply cut off" });
   if (last?.stopReason === "refusal") out.push({ severity: "error", code: "stop.refusal", detail: "model refused" });

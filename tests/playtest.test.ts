@@ -51,3 +51,37 @@ describe("playtest audit", () => {
     expect(f).toEqual(expect.arrayContaining(["roll.kept_talking", "cast.unknown_npc", "tool.error"]));
   });
 });
+
+describe("tool fixes from playtests", async () => {
+  const { runTool } = await import("@/lib/storyteller/tools");
+  it("update_npc updates a known character by id without a name", () => {
+    const out = runTool("update_npc", { id: "venn", last_interaction: "Took the bribe" }, { save: withVenn, now });
+    expect(out.isError).toBe(false);
+    expect(out.events[0]).toMatchObject({ type: "npc.upsert", id: "venn", lastInteraction: "Took the bribe" });
+    expect(out.events[0]).not.toHaveProperty("name");
+  });
+  it("update_npc still needs a name for a new character", () => {
+    expect(runTool("update_npc", {}, { save: withVenn, now }).isError).toBe(true);
+    expect(runTool("update_npc", { id: "stranger" }, { save: withVenn, now }).events).toEqual([]);
+  });
+  it("update_npc gives a new character a voice, and leaves an existing voice alone", () => {
+    const out = runTool("update_npc", { name: "Madame Corvane", voice: "older woman, silky, menacing" }, { save: base, now });
+    expect(out.events.map((e) => e.type)).toEqual(expect.arrayContaining(["npc.upsert", "npc.voice"]));
+    expect(out.ui[0]).toMatchObject({ type: "cast", npcId: "madame-corvane" });
+    const again = runTool("update_npc", { id: "venn", disposition: "hostile" }, { save: withVenn, now });
+    expect(again.events.map((e) => e.type)).toEqual(["npc.upsert"]);
+  });
+  it("set_ambience clips a long mood instead of failing", () => {
+    const out = runTool("set_ambience", { mood: "tense dark docks at night with creaking ropes, gulls and distant bells" }, { save: base, now });
+    expect(out.isError).toBe(false);
+    expect((out.ui[0] as { mood: string }).mood.length).toBeLessThanOrEqual(60);
+  });
+  it("flags narration repeated across calls in one turn", () => {
+    const t = "Berth Nine is empty, and a cut rope trails in the water.";
+    const calls = [
+      { stopReason: "tool_use", content: [{ type: "text", text: `The tide turned. ${t}` }] },
+      { stopReason: "end_turn", content: [{ type: "text", text: `${t} What do you do?` }] },
+    ];
+    expect(codes(auditTurn(calls, base, base, []))).toContain("reply.repeated");
+  });
+});

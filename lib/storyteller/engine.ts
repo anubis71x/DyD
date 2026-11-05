@@ -341,6 +341,8 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
   let charged = 0;
   let calls = 0;
   let produced = false;
+  /** Whether the player has heard any narration this turn (across all rounds). */
+  let narrated = false;
   let failure: unknown = null;
   try {
     for (let round = 0; round < ENGINE_CONFIG.maxToolRounds; round++) {
@@ -364,6 +366,7 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
       stream.on("text", (delta) => {
         produced = true;
         streamed += delta;
+        if (delta.trim()) narrated = true;
         forward(parser.push(delta));
       });
 
@@ -455,7 +458,14 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
           }
         }
         yieldToPlayer ||= !!out.yieldToPlayer;
-        results.push({ type: "tool_result", tool_use_id: call.id, content: out.result, ...(out.isError ? { is_error: true } : {}) });
+        let result = out.result;
+        // Choices close a turn. Once the player has heard the narration, another model
+        // call only repeats it (Haiku in playtests) or adds nothing, so end the turn here.
+        if (call.name === "offer_choices" && !out.isError) {
+          if (narrated) yieldToPlayer = true;
+          else result += " The player hasn't heard anything yet this turn. Write your full reply now: respond to what the player did and set the scene in two to five sentences (open with the brief 'previously' if this is the start of a session). Don't list the choices.";
+        }
+        results.push({ type: "tool_result", tool_use_id: call.id, content: result, ...(out.isError ? { is_error: true } : {}) });
       }
       if (pending.length) {
         save = await commitEvents(stores, ownerId, campaignId, pending, "tool");

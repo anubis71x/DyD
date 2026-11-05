@@ -44,6 +44,17 @@ const ok = (events: SaveEvent[], result: string, ui: TableEvent[] = []): ToolOut
 
 const sname = z.string().trim().min(1).max(200);
 
+/** Cast a voice for a character from a description of how they sound. */
+function castFor(save: SaveFile, npcId: string, npcName: string, description: string, now: string) {
+  const st = getStoryteller(save.storytellerId);
+  const used = save.npcs.filter((n) => n.id !== npcId && n.voiceId).map((n) => n.voiceId!);
+  const cast = castVoice({ description, language: save.preferences.language, usedVoiceIds: used, reservedVoiceIds: [st.narrationVoiceId] });
+  const events: SaveEvent[] = [{ type: "npc.voice", npcId, voiceId: cast.voiceId }];
+  if (cast.generated) events.unshift({ type: "voice.generated", voiceId: cast.voiceId, description: description.slice(0, 200), createdAt: now });
+  const ui: TableEvent[] = [{ type: "cast", npcId, voiceId: cast.voiceId, label: cast.label, generated: cast.generated }];
+  return { events, ui, label: cast.label, npcName };
+}
+
 const TOOLS = [
   def({
     name: "update_character",
@@ -172,50 +183,59 @@ const TOOLS = [
 
   def({
     name: "update_npc",
-    description: "Create or update a non-player character. Returns the character's id, which you use in <say who=\"...\">. Call this before a new character's first line.",
+    description: "Create or update a non-player character. Returns the character's id, which you use in <say who=\"...\">. Call this before a new character's first line. A new character is given a voice from `voice` (or from the description if you leave it out); use cast_voice only to change it.",
     inputSchema: {
       type: "object",
       properties: {
-        name: str("Display name"),
-        id: str("Existing id, if updating a known character"),
+        name: str("Display name. Required for a new character"),
+        id: str("Existing id, when updating a known character"),
         description: str("Appearance and role, one or two sentences"),
         disposition: { type: "string", enum: ["friendly", "neutral", "hostile"] },
         motivations: str("What they want"),
         last_interaction: str("One line on what just happened between them and the player"),
         memorable_line: str("A line of theirs worth remembering"),
+        voice: str("How a new character sounds (age, gender or none, accent, texture, manner), e.g. 'old sailor, gravelly, suspicious'"),
       },
-      required: ["name"],
     },
+    // Updating a known character by id doesn't need the name again (every model in playtests left it out).
     schema: z.object({
-      name: sname,
-      id: z.string().max(80).optional(),
+      name: sname.optional(),
+      id: z.string().trim().min(1).max(80).optional(),
       description: z.string().max(2000).optional(),
       disposition: z.enum(["friendly", "neutral", "hostile"]).optional(),
       motivations: z.string().max(400).optional(),
       last_interaction: z.string().max(400).optional(),
       memorable_line: z.string().max(400).optional(),
-    }),
+      voice: z.string().max(300).optional(),
+    }).refine((i) => i.name || i.id, { message: "Give a name (new character) or the id of a known one", path: ["name"] }),
     run(i, ctx) {
-      const id = i.id ? slugify(i.id) : (ctx.save.npcs.find((n) => n.name.toLowerCase() === i.name.toLowerCase())?.id ?? slugify(i.name));
+      const byName = i.name ? ctx.save.npcs.find((n) => n.name.toLowerCase() === i.name!.toLowerCase())?.id : undefined;
+      const id = i.id ? slugify(i.id) : (byName ?? slugify(i.name!));
       const existing = ctx.save.npcs.find((n) => n.id === id);
+      if (!existing && !i.name) return ok([], `No character with id "${id}". To add a new character, give a name.`);
       const event: SaveEvent = {
         type: "npc.upsert",
         id,
-        name: i.name,
+        ...(i.name ? { name: i.name } : {}),
         ...(i.description ? { description: i.description } : {}),
         ...(i.disposition ? { disposition: i.disposition } : {}),
         ...(i.motivations ? { motivations: i.motivations } : {}),
         ...(i.last_interaction ? { lastInteraction: i.last_interaction } : {}),
         ...(i.memorable_line ? { memorableLine: i.memorable_line } : {}),
       };
-      const voiceNote = existing?.voiceId ? " They already have a voice." : " They have no voice yet: call cast_voice before their first line.";
-      return ok([event], `Character id: ${id}.${voiceNote}`);
+      // Every character gets a voice as soon as they exist: in playtests models often
+      // skipped the separate cast_voice call and then gave the character lines.
+      if (existing?.voiceId) return ok([event], `Character id: ${id}. They already have a voice.`);
+      const name = i.name ?? existing?.name ?? id;
+      const after = applyEvents(ctx.save, [event], ctx.now);
+      const cast = castFor(after, id, name, i.voice || i.description || name, ctx.now);
+      return ok([event, ...cast.events], `Character id: ${id}. ${name} speaks with the voice "${cast.label}".`, cast.ui);
     },
   }),
 
   def({
     name: "cast_voice",
-    description: "Give a character a voice for the rest of the campaign. Describe how they should sound (age, gender or none, accent, texture, manner); the app picks the closest voice from its library or makes a custom one.",
+    description: "Change a character's voice for the rest of the campaign (new characters already get one from update_npc). Describe how they should sound (age, gender or none, accent, texture, manner); the app picks the closest voice from its library or makes a custom one.",
     inputSchema: {
       type: "object",
       properties: {
@@ -229,14 +249,8 @@ const TOOLS = [
       const npcId = slugify(i.npc_id);
       const npc = ctx.save.npcs.find((n) => n.id === npcId);
       if (!npc) return ok([], `No character with id "${npcId}". Call update_npc first.`);
-      const st = getStoryteller(ctx.save.storytellerId);
-      const used = ctx.save.npcs.filter((n) => n.id !== npcId && n.voiceId).map((n) => n.voiceId!);
-      const cast = castVoice({ description: i.description, language: ctx.save.preferences.language, usedVoiceIds: used, reservedVoiceIds: [st.narrationVoiceId] });
-      const events: SaveEvent[] = [{ type: "npc.voice", npcId, voiceId: cast.voiceId }];
-      if (cast.generated) events.unshift({ type: "voice.generated", voiceId: cast.voiceId, description: i.description.slice(0, 200), createdAt: ctx.now });
-      return ok(events, `${npc.name} now speaks with the voice "${cast.label}".`, [
-        { type: "cast", npcId, voiceId: cast.voiceId, label: cast.label, generated: cast.generated },
-      ]);
+      const cast = castFor(ctx.save, npcId, npc.name, i.description, ctx.now);
+      return ok(cast.events, `${npc.name} now speaks with the voice "${cast.label}".`, cast.ui);
     },
   }),
 
@@ -444,9 +458,10 @@ const TOOLS = [
 
   def({
     name: "set_ambience",
-    description: "Set the background mood for music and sound, e.g. tavern, storm, dungeon, forest night, battle, calm sea.",
-    inputSchema: { type: "object", properties: { mood: { type: "string" } }, required: ["mood"] },
-    schema: z.object({ mood: z.string().min(2).max(60) }),
+    description: "Set the background mood for music and sound in one to four words, e.g. tavern, storm, dungeon, forest night, battle, calm sea.",
+    inputSchema: { type: "object", properties: { mood: { type: "string", description: "One to four words" } }, required: ["mood"] },
+    // Clip rather than reject: a long mood is still a usable mood (Haiku wrote 60+ characters in playtests).
+    schema: z.object({ mood: z.string().trim().min(2).max(300).transform((m) => m.slice(0, 60)) }),
     run(i) {
       return ok([], "Ambience set.", [{ type: "ambience", mood: i.mood }]);
     },

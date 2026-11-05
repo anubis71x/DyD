@@ -32,7 +32,6 @@ import { createInterface } from "readline/promises";
 import { parseArgs } from "util";
 import Anthropic from "@anthropic-ai/sdk";
 import { auditTurn, type CallRecord, type Finding } from "../lib/playtest/audit";
-import { formatUsd } from "../lib/billing/money";
 import { MARKUP, responseCost, typicalTurnMicros, withMarkup, type CostLine } from "../lib/billing/pricing";
 import { createMemoryStores } from "../lib/save/memoryStore";
 import type { SaveFile } from "../lib/save/schema";
@@ -162,6 +161,8 @@ const client = {
   },
 } as unknown as Anthropic;
 
+/** Dollars with enough digits for sub-cent turns (formatUsd rounds to cents above $0.01). */
+const usd = (micros: number) => `$${(micros / USD).toFixed(micros < 10_000 ? 5 : 4)}`;
 const sum = (lines: CostLine[]) => lines.reduce((n, l) => n + l.micros, 0);
 
 /* ---------------------------------------------------------------- game */
@@ -191,6 +192,7 @@ interface TurnLog {
   findings: Finding[];
 }
 const turns: TurnLog[] = [];
+const endedTranscripts: Array<{ sessionNo: number; lines: ReturnType<typeof sessionLines> }> = [];
 const notes: string[] = [];
 let choices: string[] = [];
 let pendingCheck: { label: string; notation: string; dc?: number } | null = null;
@@ -271,6 +273,8 @@ async function play(line: string): Promise<boolean> {
   }
   if (t === "/end") {
     recapPurpose = "recap";
+    const open = await stores.sessions.latest(OWNER, campaignId);
+    if (open && !open.endedAt) endedTranscripts.push({ sessionNo: open.sessionNo, lines: sessionLines(open) });
     const ended = await endSession(OWNER, campaignId, { stores, client, emit: onEvent });
     const save = await loadCampaign(stores, OWNER, campaignId);
     const r = save.memory.sessionRecaps[save.memory.sessionRecaps.length - 1];
@@ -328,6 +332,7 @@ async function turn(input: TurnInput, label: string) {
   const session0 = await stores.sessions.latest(OWNER, campaignId);
   const histLen = session0 && !session0.endedAt ? session0.messages.length : 0;
   const partBefore = session0?.partNo ?? 1;
+  const sessionBefore = session0?.sessionId;
   choices = [];
   if (input.type !== "begin") pendingCheck = null;
   currentTurnCalls = [];
@@ -352,12 +357,12 @@ async function turn(input: TurnInput, label: string) {
   // Tool errors from the tool results added this turn.
   const toolErrors: string[] = [];
   const msgs = (session?.messages ?? []) as Array<{ role: string; content: Array<{ type: string; is_error?: boolean; content?: unknown }> }>;
-  const fresh = (session?.partNo ?? 1) === partBefore ? msgs.slice(histLen) : [];
+  const fresh = session?.sessionId === sessionBefore && (session?.partNo ?? 1) === partBefore ? msgs.slice(histLen) : msgs;
   for (const m of fresh) {
     if (m.role !== "user" || !Array.isArray(m.content)) continue;
     for (const b of m.content) if (b.type === "tool_result" && b.is_error) toolErrors.push(String(b.content));
   }
-  if ((session?.partNo ?? 1) !== partBefore) {
+  if (session?.sessionId === sessionBefore && (session?.partNo ?? 1) !== partBefore) {
     console.log(green(`  ✔ Compacted after this turn → part ${session?.partNo}`));
     log("compaction", { auto: true, carry: session?.carry, partNo: session?.partNo });
     notes.push(`Auto-compaction after turn ${turns.length + 1} (part ${session?.partNo}). Carry: ${session?.carry?.leftOff}`);
@@ -397,7 +402,7 @@ async function turn(input: TurnInput, label: string) {
   if (!args.quiet) {
     console.log(
       dim(
-        `  [${tl.calls} call${tl.calls === 1 ? "" : "s"} · ${tl.promptTokens.toLocaleString()} tok prompt · ${tl.outputTokens} out · ${formatUsd(Math.round(tl.providerMicros))} cost / ${formatUsd(tl.chargedMicros)} charged (est ${formatUsd(tl.estimateMicros)}) · ${(ms / 1000).toFixed(1)}s${tl.firstTextMs ? `, first text ${(tl.firstTextMs / 1000).toFixed(1)}s` : ""}]`,
+        `  [${tl.calls} call${tl.calls === 1 ? "" : "s"} · ${tl.promptTokens.toLocaleString()} tok prompt · ${tl.outputTokens} out · ${usd(tl.providerMicros)} cost / ${usd(tl.chargedMicros)} charged (est ${usd(tl.estimateMicros)}) · ${(ms / 1000).toFixed(1)}s${tl.firstTextMs ? `, first text ${(tl.firstTextMs / 1000).toFixed(1)}s` : ""}]`,
       ),
     );
     if (tl.tools.length) console.log(dim(`  tools: ${tl.tools.join(", ")}`));
@@ -450,7 +455,7 @@ function printCosts() {
     const v = by.get(k) ?? { n: 0, micros: 0 };
     by.set(k, { n: v.n + 1, micros: v.micros + c.providerMicros });
   }
-  for (const [k, v] of Array.from(by)) console.log(`  ${k}: ${v.n} calls, ${formatUsd(Math.round(v.micros))}`);
+  for (const [k, v] of Array.from(by)) console.log(`  ${k}: ${v.n} calls, ${usd(v.micros)}`);
 }
 
 function report(): string {
@@ -470,7 +475,7 @@ function report(): string {
   for (const t of turns) for (const n of t.tools) toolCounts.set(n, (toolCounts.get(n) ?? 0) + 1);
   const side = calls.filter((c) => c.purpose === "recap" || c.purpose === "compaction");
   const bot = calls.filter((c) => c.purpose === "bot");
-  const u = (m: number) => formatUsd(Math.round(m));
+  const u = usd;
   const st = getStoryteller(args.storyteller!);
 
   return `# Playtest ${runId}
@@ -522,7 +527,9 @@ async function finish() {
   const save: SaveFile = await loadCampaign(stores, OWNER, campaignId);
   writeFileSync(join(outDir, "save.json"), JSON.stringify(save, null, 2));
   const session = await stores.sessions.latest(OWNER, campaignId);
-  if (session) writeFileSync(join(outDir, "transcript.json"), JSON.stringify(sessionLines(session), null, 2));
+  const all = [...endedTranscripts];
+  if (session && !session.endedAt) all.push({ sessionNo: session.sessionNo, lines: sessionLines(session) });
+  writeFileSync(join(outDir, "transcript.json"), JSON.stringify(all, null, 2));
   writeFileSync(join(outDir, "report.md"), report());
   console.log(`\nReport: ${join(outDir, "report.md")}`);
 }

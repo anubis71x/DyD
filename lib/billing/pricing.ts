@@ -136,8 +136,12 @@ export function holdMicros(apiModel: string, promptTokens: number): number {
 
 /** A rough price per typical turn, for showing players before they choose. */
 export function typicalTurnMicros(apiModel: string): number {
-  // Two calls per turn; each ~16K-token prompt, mostly cached, ~600 output tokens.
-  const call = { input_tokens: 1_000, cache_read_input_tokens: 13_500, cache_creation_input_tokens: 1_500, output_tokens: 600 };
+  // Two calls per turn; each a ~15K-token prompt, almost all cached, ~300 output tokens.
+  // Measured with `yarn play` (2026-11-05, 42 turns per model): 1.6–2.4 calls per turn;
+  // per call ~0 uncached, ~9K cache read, 400–700 cache write, 190–350 output tokens.
+  // The prompt here is larger than measured to allow for long sessions (compaction at 60K),
+  // so this stays ~1.3–1.5x above real cost.
+  const call = { input_tokens: 100, cache_read_input_tokens: 14_200, cache_creation_input_tokens: 700, output_tokens: 300 };
   return withMarkup(2 * priceTokens(apiModel, call, 1).micros);
 }
 

@@ -144,6 +144,32 @@ describe("runTurn", () => {
     expect(events.find((e) => e.type === "dice")).toMatchObject({ by: "player", outcome: "success" });
   });
 
+  it("ends the turn at offer_choices once the player has heard narration", async () => {
+    const { stores, campaign } = await setup();
+    const { client, requests } = fakeClient([
+      { stop_reason: "tool_use", content: [{ type: "text", text: "The gate looms." }, { type: "tool_use", id: "c", name: "offer_choices", input: { choices: ["Knock", "Climb"] } }] },
+      { stop_reason: "end_turn", content: [{ type: "text", text: "The gate looms." }] },
+    ]);
+    const events: TableEvent[] = [];
+    await runTurn("u", campaign.campaignId, { type: "text", text: "I walk up" }, { stores, client, emit: (e) => events.push(e) });
+    expect(requests).toHaveLength(1);
+    expect(events.find((e) => e.type === "choices")).toEqual({ type: "choices", choices: ["Knock", "Climb"] });
+    // The tool result stays in the history so the next request is valid.
+    const session = (await stores.sessions.latest("u", campaign.campaignId))!;
+    expect((session.messages.at(-1) as any).content[0]).toMatchObject({ type: "tool_result", tool_use_id: "c" });
+  });
+
+  it("asks for narration when choices come before any narration", async () => {
+    const { stores, campaign } = await setup();
+    const { client, requests } = fakeClient([
+      { stop_reason: "tool_use", content: [{ type: "tool_use", id: "c", name: "offer_choices", input: { choices: ["Knock", "Climb"] } }] },
+      { stop_reason: "end_turn", content: [{ type: "text", text: "The gate looms." }] },
+    ]);
+    await runTurn("u", campaign.campaignId, { type: "text", text: "I walk up" }, { stores, client, emit: () => {} });
+    expect(requests).toHaveLength(2);
+    expect(requests[1].messages.at(-1).content[0].content).toContain("Write your full reply now");
+  });
+
   it("charges nothing and keeps history valid when the API fails before any output", async () => {
     const { stores, campaign, _debug } = await setup(2 * USD);
     const { APIError } = await import("@anthropic-ai/sdk");
