@@ -260,6 +260,7 @@ Vapi is removed and voice play is paused. Text play runs on the new stack:
 - Sessions: long sessions are compacted into parts of the same session (summary + exactly where the scene stopped, triggered by the real prompt size past ~60K tokens, run after the turn); one journal recap per session when it ends (End session, 6 h idle, or the scheduled idle-session job). Player input, rolls and interrupted replies are saved; each model call is charged as it completes.
 - Reliability: one turn per campaign at a time via a database lock (works across server instances); holds left by a crashed turn are released automatically after 15 minutes.
 - Phase 2b (design system): one dark theme for the whole signed-in app (shared tokens, Cormorant + Figtree, calm static background), Dreampool brand mark, labeled navigation that also works on phones, a balance pill with Add funds, and a new home page with a Continue card. Landing page and admin pages still use their older styling.
+- Read aloud (device voices) while voice is paused; player feedback on lines, characters, voices and the storyteller, delivered at the next turn without interrupting the current one, with instant voice recasts.
 - Multiplayer: planned in `docs/multiplayer-plan.md` (recommended after voice; save-file party model first).
 - Not yet: an image provider, ambience audio, voice, Next/React/Clerk upgrade (Phase 6), legacy route cleanup after migration (Phase 5).
 

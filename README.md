@@ -56,6 +56,15 @@ Players choose the storyteller's model per campaign and can switch during play: 
 - **Vercel Hobby limits:** functions run at most 60 seconds (all routes are set to that), and Vercel Cron runs at most once a day. The once-a-day idle-session job still works: sessions it misses are recapped when the player next plays. Each run closes up to 10 sessions. A paid plan allows longer functions and hourly crons. Note that Vercel's Hobby plan is for non-commercial use, so you'll need Pro once you take payments.
 - **Hosting note:** a turn keeps running if the player's browser disconnects, and compaction runs after the reply has been sent. On a long-running Node server this works as is. On serverless hosts, make sure functions aren't stopped when the client disconnects (e.g. Vercel's `waitUntil`); if one is stopped, everything up to the last completed step is still saved and an unfinished compaction is retried on the next turn.
 
+## 💬 Player feedback
+
+Players can rate any storyteller or character line (👍 / 👎), open a short form with quick tags and a comment, give feedback on the storyteller or the game from the play screen header, and change a character's voice from the Cast drawer or the form.
+
+- **It never interrupts a turn.** Feedback doesn't take the campaign lock or touch the conversation, so it works while the storyteller is mid-reply (and while read-aloud is talking).
+- **The storyteller hears it at the start of the next turn,** as an out-of-game `<player_feedback>` note before the player's message; it adjusts its storytelling and doesn't treat the note as an action. Player text is sanitized like any other input. If that turn fails, the feedback waits for the next one.
+- **"Change voice now" applies immediately**: the server recasts the character from the voice library, using the player's comment as a hint ("older, smoky"), and the change is safe alongside a running turn.
+- **Admins** see everything on the admin **Feedback** tab.
+
 ## 💳 Billing
 
 Players keep a prepaid dollar balance and pay what each turn actually costs us, plus a markup.
@@ -102,6 +111,7 @@ All routes require a signed-in Clerk user, and every read or write is scoped to 
 | `GET /api/campaigns/[id]` | Save file plus the current session's transcript |
 | `PATCH /api/campaigns/[id]` | Switch the storyteller's model `{ modelId }` |
 | `DELETE /api/campaigns/[id]` | Delete a campaign |
+| `POST /api/campaigns/[id]/feedback` | Send feedback or recast a voice (works mid-turn) |
 | `POST /api/campaigns/[id]/session/end` | End the current session and write its recap |
 | `GET /api/cron/close-sessions` | Scheduled job: close idle sessions (needs `Authorization: Bearer $CRON_SECRET`) |
 | `POST /api/campaigns/[id]/turn` | Play a turn (`begin`, `text`, `choice` or `roll`); streams table events as server-sent events |
@@ -119,6 +129,7 @@ All require a signed-in user. **Admin** means the user's Clerk id is in `ADMIN_U
 | `/api/user` | The signed-in user's profile and balance |
 | `/api/admin` | `GET ?me=1`: am I an admin? (anyone). Everything else: admin |
 | `/api/admin/billing` | Monthly billing report (the admin Billing page): admin |
+| `/api/admin/feedback` | Recent player feedback (the admin Feedback page): admin |
 | `/api/products`, `/api/collections` (+ `/[id]`) | Read: anyone signed in. Create, edit, delete: admin |
 | `/api/orders` (+ `/[orderId]`, `/customers/[customerId]`) | Admin |
 | `/api/search/[query]`, `/api/products/[productId]/related` | Anyone signed in |

@@ -5,6 +5,16 @@ import type { Asset, SaveFile } from "@/lib/save/schema";
 import type { TableEvent, TranscriptLine, TurnInput } from "@/lib/storyteller/events";
 import type { ModelId } from "@/lib/storyteller/models";
 
+/** What the feedback form sends (validated on the server by FeedbackInput). */
+export interface FeedbackPayload {
+  target: { type: "line" | "character" | "voice" | "storyteller" | "game"; npcId?: string; speaker?: string; text?: string };
+  rating?: "up" | "down";
+  tags?: string[];
+  comment?: string;
+  tellStoryteller?: boolean;
+  recast?: boolean;
+}
+
 export type FeedLine = TranscriptLine & { id: number; live?: boolean } | { id: number; kind: "notice"; speaker: "system"; text: string };
 
 export interface DiceView {
@@ -308,6 +318,26 @@ export function useStorySession(campaignId: string, opts: { onEvent?: (e: TableE
     }
   }, [campaignId]);
 
+  /**
+   * Send feedback. Independent of turns: works while the storyteller is
+   * mid-reply and never changes the busy state. A voice recast updates the
+   * save right away.
+   */
+  const sendFeedback = useCallback(
+    async (input: FeedbackPayload): Promise<{ ok: true; recastLabel?: string } | { ok: false; error: string }> => {
+      const res = await fetch(`/api/campaigns/${campaignId}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: body.error ?? "Couldn't send feedback." };
+      if (body.recast) setState((s) => ({ ...s, save: body.save }));
+      return { ok: true, ...(body.recast ? { recastLabel: body.recast.label as string } : {}) };
+    },
+    [campaignId],
+  );
+
   /** Re-read the balance (e.g. after a top-up, which the webhook credits a moment later). */
   const refreshBalance = useCallback(async () => {
     const res = await fetch("/api/campaigns", { cache: "no-store" });
@@ -331,5 +361,5 @@ export function useStorySession(campaignId: string, opts: { onEvent?: (e: TableE
     };
   }, [load, send]);
 
-  return { state, send, setModel, endSession, refreshBalance, clearChanged, dismissHandout, dismissError };
+  return { state, send, setModel, endSession, sendFeedback, refreshBalance, clearChanged, dismissHandout, dismissError };
 }

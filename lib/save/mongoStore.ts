@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { connectToDB } from "@/lib/mongoDB";
 import type { SaveFile } from "./schema";
-import { summarize, type PlaySession, type Stores } from "./store";
+import { summarize, type FeedbackRecord, type PlaySession, type Stores } from "./store";
 
 /* Collections for the new save system. The legacy per-session collections
  * stay untouched until the migration script has run (see scripts/). */
@@ -83,6 +83,43 @@ lockSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 3600 });
 const LockModel = mongoose.models.Lock || mongoose.model("Lock", lockSchema);
 
 const isDuplicateKey = (e: unknown) => (e as { code?: number })?.code === 11000;
+
+const feedbackSchema = new mongoose.Schema(
+  {
+    _id: { type: String, required: true },
+    ownerId: { type: String, required: true },
+    campaignId: { type: String, required: true },
+    sessionId: { type: String },
+    storytellerId: { type: String, required: true },
+    modelId: { type: String },
+    target: { type: mongoose.Schema.Types.Mixed, required: true },
+    rating: { type: String, enum: ["up", "down"] },
+    tags: { type: [String], default: [] },
+    comment: { type: String },
+    tellStoryteller: { type: Boolean, required: true },
+    deliveredAt: { type: Date },
+    createdAt: { type: Date, required: true, index: true },
+  },
+  { versionKey: false, minimize: false },
+);
+feedbackSchema.index({ ownerId: 1, campaignId: 1, tellStoryteller: 1, deliveredAt: 1 });
+const FeedbackModel = mongoose.models.Feedback || mongoose.model("Feedback", feedbackSchema);
+
+const toFeedback = (d: Record<string, any>): FeedbackRecord => ({
+  id: d._id,
+  ownerId: d.ownerId,
+  campaignId: d.campaignId,
+  ...(d.sessionId ? { sessionId: d.sessionId } : {}),
+  storytellerId: d.storytellerId,
+  ...(d.modelId ? { modelId: d.modelId } : {}),
+  target: d.target,
+  ...(d.rating ? { rating: d.rating } : {}),
+  tags: d.tags ?? [],
+  ...(d.comment ? { comment: d.comment } : {}),
+  tellStoryteller: d.tellStoryteller,
+  ...(d.deliveredAt ? { deliveredAt: new Date(d.deliveredAt).toISOString() } : {}),
+  createdAt: new Date(d.createdAt).toISOString(),
+});
 
 const CampaignModel = mongoose.models.Campaign || mongoose.model("Campaign", campaignSchema);
 const CampaignEventModel = mongoose.models.CampaignEvent || mongoose.model("CampaignEvent", campaignEventSchema);
@@ -236,6 +273,26 @@ const mongoStores: Stores = {
         if ((await mongoStores.wallet.post({ refId, userId, amountMicros: -h.amountMicros, kind: "release", meta: { stale: true } })) === "ok") n++;
       }
       return n;
+    },
+  },
+  feedback: {
+    async add(f) {
+      const { id, deliveredAt, createdAt, ...rest } = f;
+      await FeedbackModel.create({ _id: id, ...rest, createdAt: new Date(createdAt), ...(deliveredAt ? { deliveredAt: new Date(deliveredAt) } : {}) });
+    },
+    async pending(ownerId, campaignId) {
+      const docs = await FeedbackModel.find({ ownerId, campaignId, tellStoryteller: true, deliveredAt: { $exists: false } })
+        .sort({ createdAt: 1 })
+        .limit(20)
+        .lean<Record<string, any>[]>();
+      return docs.map(toFeedback);
+    },
+    async markDelivered(ids, at) {
+      if (ids.length) await FeedbackModel.updateMany({ _id: { $in: ids } }, { $set: { deliveredAt: new Date(at) } });
+    },
+    async recent(limit, filter) {
+      const docs = await FeedbackModel.find(filter?.rating ? { rating: filter.rating } : {}).sort({ createdAt: -1 }).limit(limit).lean<Record<string, any>[]>();
+      return docs.map(toFeedback);
     },
   },
   locks: {

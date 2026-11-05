@@ -50,3 +50,34 @@ export function castVoice(params: {
   const desc = params.description.trim().slice(0, 120) || "custom voice";
   return { voiceId: `gen-${slugify(desc).slice(0, 40)}`, label: `Custom: ${desc}`, generated: true, score: best?.score ?? 0 };
 }
+
+/**
+ * Pick a different library voice for a character the player wants recast.
+ * Matches the character's description plus the player's hint (e.g. "older,
+ * raspier, female"), never returns the current voice, and avoids voices other
+ * characters already use. Always a library voice, so the change is immediate.
+ */
+export function recastVoice(params: {
+  npc: { name: string; description: string };
+  currentVoiceId?: string;
+  hint?: string;
+  language: string;
+  usedVoiceIds: string[];
+  reservedVoiceIds?: string[];
+  library?: Voice[];
+}): CastResult | null {
+  const lib = params.library ?? VOICES;
+  const lang = params.language.slice(0, 2).toLowerCase();
+  const hintWords = new Set(words(params.hint ?? ""));
+  const descWords = new Set(words(`${params.npc.name} ${params.npc.description}`));
+  let best: { v: Voice; score: number } | null = null;
+  for (const v of lib) {
+    if (v.id === params.currentVoiceId || params.reservedVoiceIds?.includes(v.id) || !v.languages.includes(lang)) continue;
+    let score = 0;
+    // The player's hint counts double: it's what they asked for.
+    for (const t of v.tags) score += (hintWords.has(t) ? 2 : 0) + (descWords.has(t) ? 1 : 0);
+    if (params.usedVoiceIds.includes(v.id)) score -= 1.5;
+    if (!best || score > best.score) best = { v, score };
+  }
+  return best ? { voiceId: best.v.id, label: best.v.label, generated: false, score: best.score } : null;
+}

@@ -8,6 +8,7 @@ import { useIsAdmin } from "@/hooks/use-is-admin";
 const TABS = [
   { href: "/dashboard/admin", label: "Admins" },
   { href: "/dashboard/admin/billing", label: "Billing" },
+  { href: "/dashboard/admin/feedback", label: "Feedback" },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

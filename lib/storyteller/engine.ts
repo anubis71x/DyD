@@ -20,6 +20,8 @@ import { buildSystemPrompt, sessionOpening } from "./prompt";
 import { hasStory, RECAP_MODEL, sessionLines, summarizeSession } from "./recap";
 import { SayParser } from "./sayParser";
 import { getStoryteller } from "./storytellers";
+import { feedbackBlock } from "./feedback";
+import { sanitizePlayerText } from "./sanitize";
 import { runTool, TOOL_PARAMS } from "./tools";
 import { transcriptFromMessages } from "./transcript";
 
@@ -212,18 +214,7 @@ function validateInput(input: TurnInput): string | null {
   }
 }
 
-/**
- * Neutralize anything in player-supplied text that looks like the prompt's
- * own markers, so a player can't fake a dice result, close their <player>
- * tag, or pose as the save file or a recap.
- */
-export function sanitizePlayerText(text: string, max: number): string {
-  return text
-    .slice(0, max)
-    .replace(/<\s*\/?\s*(player|save_file|this_session_so_far|last_session_recap|say)\b[^>]*>/gi, "")
-    .replace(/\[\s*dice\s*\]/gi, "(dice)")
-    .trim();
-}
+export { sanitizePlayerText } from "./sanitize";
 
 /**
  * Turn the player's input into message text, rolling dice server-side. A roll
@@ -335,11 +326,15 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
   // The player's input is saved before the model is called.
   const content: BetaContentBlockParam[] = [];
   if (opening) content.push({ type: "text", text: opening });
+  // Feedback the player gave since the last turn (it never interrupts a turn; it waits for this one).
+  const feedback = await stores.feedback.pending(ownerId, campaignId);
+  if (feedback.length) content.push({ type: "text", text: feedbackBlock(feedback, save) });
   const playerText = playerContent(input, session.pendingCheck, deps);
   // A roll answers the pending check; typing or choosing something else moves on from it.
   if (input.type !== "begin") session.pendingCheck = null;
   if (playerText) content.push({ type: "text", text: playerText });
-  messages.push({ role: "user", content });
+  const userMessage: BetaMessageParam = { role: "user", content };
+  messages.push(userMessage);
   await persist();
   emit({ type: "turn.start", sessionNo: session.sessionNo });
 
@@ -480,6 +475,10 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
     if (!produced && input.type !== "roll" && messages[messages.length - 1]?.role === "user") messages.pop();
   }
 
+  // Feedback counts as delivered only if the message carrying it stayed in the history.
+  if (feedback.length && messages.includes(userMessage)) {
+    await stores.feedback.markDelivered(feedback.map((f) => f.id), new Date().toISOString());
+  }
   await stores.wallet.post({ refId: `turn:${turnId}:release`, userId: ownerId, amountMicros: hold, kind: "release", meta: { campaignId } });
   if (calls) {
     const u = usage[model.id] ?? EMPTY_USAGE;

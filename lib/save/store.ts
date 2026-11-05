@@ -98,6 +98,24 @@ export interface LedgerEntry extends Omit<LedgerEntryInput, "requireFunds"> {
   createdAt: string;
 }
 
+/** Player feedback on a line, a character, a voice, the storyteller or the game. */
+export interface FeedbackRecord {
+  id: string;
+  ownerId: string;
+  campaignId: string;
+  sessionId?: string;
+  storytellerId: string;
+  modelId?: string;
+  target: { type: "line" | "character" | "voice" | "storyteller" | "game"; npcId?: string; speaker?: string; text?: string };
+  rating?: "up" | "down";
+  tags: string[];
+  comment?: string;
+  /** Pass it to the storyteller at the start of the next turn. */
+  tellStoryteller: boolean;
+  deliveredAt?: string;
+  createdAt: string;
+}
+
 export interface Stores {
   campaigns: {
     list(ownerId: string): Promise<CampaignSummary[]>;
@@ -131,6 +149,14 @@ export interface Stores {
      * that crashed between hold and settle). Returns how many were released.
      */
     releaseStaleHolds(userId: string, olderThanMs: number): Promise<number>;
+  };
+  feedback: {
+    add(f: FeedbackRecord): Promise<void>;
+    /** Feedback for the storyteller that hasn't been delivered yet, oldest first. */
+    pending(ownerId: string, campaignId: string): Promise<FeedbackRecord[]>;
+    markDelivered(ids: string[], at: string): Promise<void>;
+    /** Newest first, for admins. */
+    recent(limit: number, filter?: { rating?: "up" | "down" }): Promise<FeedbackRecord[]>;
   };
   locks: {
     /** Take a named lock for `ttlMs`. Returns a token to release it with, or null if someone else holds it. */

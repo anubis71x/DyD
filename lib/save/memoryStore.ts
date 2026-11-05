@@ -1,5 +1,5 @@
 import type { SaveFile } from "./schema";
-import { summarize, type LedgerEntry, type PlaySession, type StoredEvent, type Stores } from "./store";
+import { summarize, type FeedbackRecord, type LedgerEntry, type PlaySession, type StoredEvent, type Stores } from "./store";
 
 /** In-memory Stores for tests and local scripts. Not for production. */
 export function createMemoryStores(initialBalances: Record<string, number> = {}) {
@@ -9,6 +9,7 @@ export function createMemoryStores(initialBalances: Record<string, number> = {})
   const balances = new Map(Object.entries(initialBalances));
   const ledger = new Map<string, LedgerEntry>();
   const locks = new Map<string, { token: string; expiresAt: number }>();
+  const feedback: FeedbackRecord[] = [];
   const clone = <T,>(x: T): T => structuredClone(x);
 
   const stores: Stores = {
@@ -91,6 +92,24 @@ export function createMemoryStores(initialBalances: Record<string, number> = {})
         return n;
       },
     },
+    feedback: {
+      async add(f) {
+        feedback.push(clone(f));
+      },
+      async pending(ownerId, campaignId) {
+        return feedback.filter((f) => f.ownerId === ownerId && f.campaignId === campaignId && f.tellStoryteller && !f.deliveredAt).map(clone);
+      },
+      async markDelivered(ids, at) {
+        for (const f of feedback) if (ids.includes(f.id)) f.deliveredAt = at;
+      },
+      async recent(limit, filter) {
+        return feedback
+          .filter((f) => !filter?.rating || f.rating === filter.rating)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, limit)
+          .map(clone);
+      },
+    },
     locks: {
       async acquire(key, ttlMs) {
         const cur = locks.get(key);
@@ -104,5 +123,5 @@ export function createMemoryStores(initialBalances: Record<string, number> = {})
       },
     },
   };
-  return { stores, _debug: { campaigns, events, sessions, balances, ledger, locks } };
+  return { stores, _debug: { campaigns, events, sessions, balances, ledger, locks, feedback } };
 }

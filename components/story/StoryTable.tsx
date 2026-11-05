@@ -1,9 +1,10 @@
 "use client";
 
+import { MessageSquarePlus, ThumbsDown, ThumbsUp } from "lucide-react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useStorySession, type DiceView, type FeedLine, type StoryState } from "@/hooks/use-story-session";
+import { useStorySession, type DiceView, type FeedbackPayload, type FeedLine, type StoryState } from "@/hooks/use-story-session";
 import type { SaveFile } from "@/lib/save/schema";
 import { DEFAULT_MODEL_ID, getModel } from "@/lib/storyteller/models";
 import { getStoryteller } from "@/lib/storyteller/storytellers";
@@ -12,6 +13,7 @@ import type { TurnInput } from "@/lib/storyteller/events";
 import { AddFundsDialog } from "@/components/billing/AddFunds";
 import { formatUsd } from "@/lib/billing/money";
 import { ModelSelect, perTurn } from "./ModelPicker";
+import { FeedbackPanel, type FeedbackTarget } from "./FeedbackPanel";
 import { useReadAloud } from "./useReadAloud";
 import { AccentScope, Chip, npcColor, Portrait } from "./ui";
 
@@ -19,7 +21,31 @@ const mix = (pct: number) => `color-mix(in srgb, var(--accent) ${pct}%, transpar
 
 /* ---------------------------------------------------------------- feed */
 
-function Line({ line, save, speaking }: { line: FeedLine; save: SaveFile; speaking: boolean }) {
+interface LineFeedback {
+  rated?: "up" | "down";
+  onRate: (rating: "up" | "down") => void;
+  onMore: () => void;
+}
+
+/** Quiet per-line feedback: rate instantly, or open the full form. Never blocks the turn. */
+function LineActions({ fb, who }: { fb: LineFeedback; who: string }) {
+  const btn = "rounded-md p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-200";
+  return (
+    <span className="ml-1 inline-flex items-center gap-0.5 opacity-60 transition group-hover:opacity-100 group-focus-within:opacity-100">
+      <button type="button" aria-label={`Good line from ${who}`} aria-pressed={fb.rated === "up"} onClick={() => fb.onRate("up")} className={`${btn} ${fb.rated === "up" ? "text-emerald-300" : ""}`}>
+        <ThumbsUp className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" aria-label={`Not a great line from ${who}`} aria-pressed={fb.rated === "down"} onClick={() => fb.onRate("down")} className={`${btn} ${fb.rated === "down" ? "text-rose-300" : ""}`}>
+        <ThumbsDown className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" aria-label={`More feedback on this line from ${who}`} onClick={fb.onMore} className={btn}>
+        <MessageSquarePlus className="h-3.5 w-3.5" />
+      </button>
+    </span>
+  );
+}
+
+function Line({ line, save, speaking, fb }: { line: FeedLine; save: SaveFile; speaking: boolean; fb?: LineFeedback }) {
   const st = getStoryteller(save.storytellerId);
   if (line.kind === "notice") {
     return <p className="flex max-w-[68ch] items-center gap-2 text-xs text-zinc-500 before:h-px before:w-5 before:bg-white/10">{line.text}</p>;
@@ -40,10 +66,13 @@ function Line({ line, save, speaking }: { line: FeedLine; save: SaveFile; speaki
   }
   if (line.kind === "narration") {
     return (
-      <div className="flex max-w-[68ch] gap-3">
+      <div className="group flex max-w-[68ch] gap-3">
         <Portrait name={st.name} color={st.accentColor} />
         <div>
-          <div className="mb-0.5 flex items-center gap-2 text-xs text-zinc-500">{st.name}</div>
+          <div className="mb-0.5 flex items-center gap-2 text-xs text-zinc-500">
+            {st.name}
+            {fb && !speaking && <LineActions fb={fb} who={st.name} />}
+          </div>
           <p
             className="whitespace-pre-line font-[family-name:var(--font-display)] text-xl leading-relaxed text-zinc-100"
             style={speaking ? { textShadow: `0 0 18px ${mix(35)}` } : undefined}
@@ -59,13 +88,14 @@ function Line({ line, save, speaking }: { line: FeedLine; save: SaveFile; speaki
   const color = npcColor(line.speaker);
   const voice = voiceLabel(npc?.voiceId, save.generatedVoices);
   return (
-    <div className="flex max-w-[68ch] gap-3">
+    <div className="group flex max-w-[68ch] gap-3">
       <Portrait name={name} color={color} />
       <div>
         <div className="mb-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
           {name}
           {voice && <Chip>{voice}</Chip>}
           {line.mood && <span className="italic">{line.mood}</span>}
+          {fb && !speaking && <LineActions fb={fb} who={name} />}
         </div>
         <p
           className="whitespace-pre-line rounded-xl rounded-tl-sm border border-white/10 bg-[#151a22] px-3 py-2"
@@ -78,7 +108,7 @@ function Line({ line, save, speaking }: { line: FeedLine; save: SaveFile; speaki
   );
 }
 
-function Feed({ state, send }: { state: StoryState; send: (i: TurnInput) => void }) {
+function Feed({ state, send, lineFeedback }: { state: StoryState; send: (i: TurnInput) => void; lineFeedback: (l: FeedLine) => LineFeedback | undefined }) {
   const ref = useRef<HTMLDivElement>(null);
   const last = state.lines[state.lines.length - 1];
   useEffect(() => {
@@ -112,7 +142,7 @@ function Feed({ state, send }: { state: StoryState; send: (i: TurnInput) => void
         </div>
       )}
       {state.lines.map((l) => (
-        <Line key={l.id} line={l} save={save} speaking={"live" in l && !!l.live} />
+        <Line key={l.id} line={l} save={save} speaking={"live" in l && !!l.live} fb={lineFeedback(l)} />
       ))}
       {state.busy && !state.speaker && (
         <p className="text-sm text-zinc-500" role="status">
@@ -411,7 +441,7 @@ function Meter({ label, current, max }: { label: string; current: number; max?: 
   );
 }
 
-function DrawerBody({ which, save }: { which: DrawerKey; save: SaveFile }) {
+function DrawerBody({ which, save, onFeedback }: { which: DrawerKey; save: SaveFile; onFeedback: (t: FeedbackTarget) => void }) {
   const c = save.character;
   const card = "rounded-lg border border-white/10 bg-[#1c222d] px-3 py-2 text-sm";
   if (which === "character") {
@@ -492,6 +522,22 @@ function DrawerBody({ which, save }: { which: DrawerKey; save: SaveFile }) {
               {n.description && <p className="text-xs text-zinc-400">{n.description}</p>}
               {n.lastInteraction && <p className="text-xs text-zinc-500">Last: {n.lastInteraction}</p>}
               <p className="text-xs text-zinc-500">Voice: {voiceLabel(n.voiceId, save.generatedVoices) ?? "not cast yet"}</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onFeedback({ type: "voice", npcId: n.id, title: `${n.name}'s voice`, canRecast: true })}
+                  className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-zinc-300 hover:border-[color:var(--accent)]"
+                >
+                  Change voice
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onFeedback({ type: "character", npcId: n.id, title: n.name, canRecast: true })}
+                  className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-zinc-300 hover:border-[color:var(--accent)]"
+                >
+                  Feedback
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -535,7 +581,35 @@ const RAIL: { key: DrawerKey; label: string; path: string }[] = [
 
 export function StoryTable({ campaignId }: { campaignId: string }) {
   const readAloud = useReadAloud();
-  const { state, send: sendTurn, setModel, endSession, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId, { onEvent: readAloud.onEvent });
+  const { state, send: sendTurn, setModel, endSession, sendFeedback, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId, { onEvent: readAloud.onEvent });
+  // Feedback never touches the turn: no busy state, no lock, no interruption of speech.
+  const [feedback, setFeedback] = useState<FeedbackTarget | null>(null);
+  const [rated, setRated] = useState<Record<number, "up" | "down">>({});
+  const lineTarget = (l: FeedLine): FeedbackTarget | null => {
+    if (l.kind !== "narration" && l.kind !== "npc") return null;
+    const npc = l.kind === "npc" ? state.save?.npcs.find((n) => n.id === l.speaker) : undefined;
+    return {
+      type: "line",
+      speaker: l.speaker,
+      ...(npc ? { npcId: npc.id } : {}),
+      text: l.text,
+      title: npc ? `${npc.name}'s line` : "Narration",
+      canRecast: !!npc,
+    };
+  };
+  const lineFeedback = (l: FeedLine): LineFeedback | undefined => {
+    const t = lineTarget(l);
+    if (!t) return undefined;
+    const { title, canRecast, ...target } = t;
+    return {
+      ...(rated[l.id] ? { rated: rated[l.id] } : {}),
+      onRate: (rating) => {
+        setRated((r) => ({ ...r, [l.id]: rating }));
+        void sendFeedback({ target, rating, tellStoryteller: true } satisfies FeedbackPayload);
+      },
+      onMore: () => setFeedback(t),
+    };
+  };
   // Acting interrupts the storyteller, as it will with real voice.
   const send = (input: TurnInput) => {
     if (input.type !== "begin") readAloud.stop();
@@ -580,6 +654,13 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
         </div>
         <div className="flex-1" />
         <ModelSelect value={save.modelId ?? DEFAULT_MODEL_ID} onChange={setModel} disabled={state.busy} />
+        <button
+          type="button"
+          onClick={() => setFeedback({ type: "storyteller", title: `${st.name} and the game` })}
+          className="hidden rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-400 hover:text-zinc-100 md:inline"
+        >
+          Feedback
+        </button>
         {state.sessionNo !== null && !state.sessionEnded && (
           <button
             type="button"
@@ -639,13 +720,13 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
                   <button type="button" onClick={() => setDrawer(null)} className="h-8 w-8 rounded-lg bg-[#1c222d]" aria-label="Close panel">✕</button>
                 </header>
                 <div className="flex flex-col gap-3 overflow-y-auto p-4">
-                  <DrawerBody which={drawer} save={save} />
+                  <DrawerBody which={drawer} save={save} onFeedback={setFeedback} />
                 </div>
               </>
             )}
           </aside>
 
-          <Feed state={state} send={send} />
+          <Feed state={state} send={send} lineFeedback={lineFeedback} />
 
           {state.error && (
             <div role="alert" className="mx-3 mb-2 flex items-start justify-between gap-3 rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-100 sm:mx-6">
@@ -674,6 +755,12 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
               <button type="button" onClick={() => document.getElementById("turn-input")?.focus()} className="rounded-full border border-dashed border-white/15 px-3.5 py-1.5 text-sm text-zinc-500">
                 Something else…
               </button>
+            </div>
+          )}
+
+          {feedback && (
+            <div className="absolute bottom-[150px] right-3 z-20 sm:right-6">
+              <FeedbackPanel key={JSON.stringify(feedback)} target={feedback} onClose={() => setFeedback(null)} send={sendFeedback} />
             </div>
           )}
 
