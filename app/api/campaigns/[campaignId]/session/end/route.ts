@@ -7,7 +7,8 @@ import { endSession } from "@/lib/storyteller/engine";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 90;
+// Vercel Hobby allows at most 60 s (Next needs a literal here). On a plan with longer limits this can be raised.
+export const maxDuration = 60;
 
 /** End the current session and write its recap. Returns the updated save. */
 export const POST = handle("session_end_POST", async (_req: Request, { params }: { params: { campaignId: string } }) => {

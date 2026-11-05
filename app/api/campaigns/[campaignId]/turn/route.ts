@@ -9,8 +9,9 @@ import type { TableEvent, TurnInput } from "@/lib/storyteller/events";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-// A turn plus the compaction that may follow it (and up to 30 s waiting for the lock).
-export const maxDuration = 140;
+// A turn plus the compaction that may follow it, and a short wait for the lock.
+// Vercel Hobby allows at most 60 s (Next needs a literal here). On a plan with longer limits this can be raised.
+export const maxDuration = 60;
 
 const Input = z.discriminatedUnion("type", [
   z.object({ type: z.literal("begin") }),

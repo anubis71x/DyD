@@ -7,8 +7,8 @@ export const getClient = () => (client ??= new Anthropic());
 
 /** One turn (or recap) per campaign at a time, across all server instances. */
 export const campaignLockKey = (userId: string, campaignId: string) => `campaign:${userId}:${campaignId}`;
-/** Longer than the turn route's maxDuration, so a crashed turn's lock frees itself. */
-export const CAMPAIGN_LOCK_TTL_MS = 150_000;
+/** Just longer than the routes' maxDuration (60 s), so a stopped function's lock frees itself soon after. */
+export const CAMPAIGN_LOCK_TTL_MS = 75_000;
 
 /**
  * Take the campaign lock, waiting up to `waitMs` for the holder to finish
@@ -17,7 +17,7 @@ export const CAMPAIGN_LOCK_TTL_MS = 150_000;
 export async function acquireCampaignLock(
   locks: { acquire(key: string, ttlMs: number): Promise<string | null> },
   key: string,
-  waitMs = 30_000,
+  waitMs = 10_000,
 ): Promise<string | null> {
   const deadline = Date.now() + waitMs;
   for (;;) {
