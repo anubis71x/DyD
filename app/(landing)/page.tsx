@@ -1,455 +1,269 @@
-"use client"
+import { ArrowRight, BookOpen, Dices, Languages, MessageSquareText, Mic, Save } from "lucide-react";
+import Link from "next/link";
+import type { CSSProperties, ReactNode } from "react";
+import { Brand } from "@/components/brand";
+import { formatUsd, MIN_TOPUP_CENTS, SIGNUP_CREDIT_MICROS } from "@/lib/billing/money";
+import { MARKUP, typicalTurnMicros } from "@/lib/billing/pricing";
+import { MODELS } from "@/lib/storyteller/models";
+import { STORYTELLERS } from "@/lib/storyteller/storytellers";
 
-import { useEffect, useState, useRef } from "react"
-import { Swiper, SwiperSlide } from "swiper/react"
-import { Mousewheel, EffectFade, Pagination } from "swiper/modules"
-import { motion, AnimatePresence } from "framer-motion"
-import Image from "next/image"
-import { ChevronDown, Play, Scroll, Users, Wand2, Swords } from "lucide-react"
+/* Clicking anything marked data-conversion="start-adventuring" reports a Google Ads conversion (see GoogleTag). */
+function StartButton({ children = "Start adventuring", className = "" }: { children?: ReactNode; className?: string }) {
+  return (
+    <Link
+      href="/dashboard"
+      data-conversion="start-adventuring"
+      className={`inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${className}`}
+    >
+      {children} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+    </Link>
+  );
+}
 
-// Import Swiper styles
-import "swiper/css"
-import "swiper/css/effect-fade"
-import "swiper/css/pagination"
-import { useRouter } from "next/navigation"
+function SectionHeading({ id, eyebrow, title, children }: { id: string; eyebrow: string; title: string; children?: ReactNode }) {
+  return (
+    <div className="mx-auto mb-10 max-w-2xl text-center">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
+      <h2 id={id} className="mt-2 text-balance font-[family-name:var(--font-display)] text-4xl font-semibold leading-tight sm:text-5xl">
+        {title}
+      </h2>
+      {children && <p className="mt-3 text-lg text-muted-foreground">{children}</p>}
+    </div>
+  );
+}
 
-// AI Features data
-const aiFeatures = [
-  {
-    name: "CREATE EPIC QUESTS",
-    description: "",
-    image: "https://i.ibb.co/MxBtBCrp/DALL-E-2025-03-26-23-59-04-A-fantasy-themed-illustration-of-an-Adventure-Generator-concept-The-image.webp",
-  },
-  {
-    name: "GENERATE LIFELIKE NPCs",
-    description: "",
-    image: "https://i.ibb.co/3y3t4Hf3/npc.webp",
-  },
-  {
-    name: "BUILD IMMERSIVE WORLDS",
-    description: "",
-    image: "https://i.ibb.co/QvbRsxTK/world.webp",
-  },
-  {
-    name: "MANAGE COMBAT WITH EASE",
-    description: "",
-    image: "https://i.ibb.co/MD54Bfpz/8ca46b50-151e-42d2-8214-43287a07d1ee.png",
-  
-  },
-]
+/** A static replica of the play screen, so visitors see what playing looks like. */
+function TablePreview() {
+  const line = (who: string, color: string, voice: string | null, text: string, kind: "narration" | "npc") => (
+    <div className="flex gap-3">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full font-[family-name:var(--font-display)] text-sm font-bold text-[#14100b]" style={{ background: color }} aria-hidden="true">
+        {who[0]}
+      </span>
+      <div className="min-w-0">
+        <div className="mb-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          {who}
+          {voice && <span className="rounded-full border border-border px-1.5 py-px">{voice}</span>}
+        </div>
+        {kind === "narration" ? (
+          <p className="font-[family-name:var(--font-display)] text-lg leading-snug">{text}</p>
+        ) : (
+          <p className="rounded-lg rounded-tl-sm border border-border bg-secondary px-3 py-1.5 text-sm" style={{ borderLeft: `3px solid ${color}` }}>
+            {text}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+  return (
+    <div className="relative rounded-2xl border border-border bg-card/90 p-5 shadow-[0_30px_80px_-30px_rgba(211,139,76,0.35)] backdrop-blur" aria-label="Example of a game in progress" role="img">
+      <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
+        <div>
+          <p className="font-[family-name:var(--font-display)] text-lg font-semibold">The Salt Lantern</p>
+          <p className="text-[11px] text-muted-foreground">Session 3 · told by Eldrath Shadowweaver</p>
+        </div>
+        <span className="rounded-full border border-border px-2.5 py-1 font-mono text-[11px] text-muted-foreground">✓ Saved</span>
+      </div>
+      <div className="flex flex-col gap-4">
+        {line("Eldrath Shadowweaver", "#d38b4c", null, "Rain needles the window. A leather ledger sits at Venn's elbow, its corner stamped with a wave.", "narration")}
+        {line("Harbormaster Venn", "hsl(38 45% 68%)", "Gravel Baritone", "Port's closed after dark, girl. State your business.", "npc")}
+        <div className="ml-11 flex flex-wrap gap-2">
+          {["Slip the ledger off his desk", "Show him the forged writ"].map((c) => (
+            <span key={c} className="rounded-full border border-border bg-secondary px-3 py-1 text-xs">
+              {c}
+            </span>
+          ))}
+        </div>
+        <div className="ml-11 flex items-center gap-3 rounded-xl border border-primary/50 bg-primary/10 px-3 py-2">
+          <Dices className="h-5 w-5 text-primary" aria-hidden="true" />
+          <span className="text-sm">
+            Sleight of Hand · <span className="font-mono">d20+5 → 22</span> <span className="text-emerald-300">beats DC 14</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
+const FEATURES = [
+  { icon: MessageSquareText, title: "A storyteller who listens", body: "Say or type anything. Your storyteller adapts the story, voices every character and keeps the rules honest without slowing you down." },
+  { icon: Save, title: "It remembers everything", body: "Your character sheet, inventory, quests and the people you've met update as you play. Each session ends with a journal entry, and you can download your save file anytime." },
+  { icon: Dices, title: "Fair dice", body: "Rolls happen on our servers, not in your browser or the AI's imagination, and the storyteller narrates from the real result." },
+  { icon: BookOpen, title: "Any setting", body: "Dark fantasy, fairy tale, cozy tavern or tactical war story. Rules are compatible with fifth edition, from the open SRD." },
+  { icon: Languages, title: "In your language", body: "Play in English, Español, 日本語 and many more. Just start talking in the language you want." },
+  { icon: Mic, title: "Voice play returns soon", body: "Talk to your storyteller and hear every character in their own voice. Voice is paused while we move to our new storyteller; text play works today." },
+];
 
-
-export default function DndAiLanding() {
-  const [activeIndex, setActiveIndex] = useState(0)
-  const router = useRouter()
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const particlesRef = useRef<HTMLDivElement>(null)
-  const [hoveredFeature, setHoveredFeature] = useState<string | null>(null)
-
-  // Track mouse position for parallax effects
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-
-      // Move particles based on mouse position
-      if (particlesRef.current) {
-        const particles = particlesRef.current.querySelectorAll(".particle")
-        particles.forEach((particle) => {
-          const speed = Number.parseFloat((particle as HTMLElement).dataset.speed || "0.5")
-          const x = (window.innerWidth - e.clientX * speed) / 100
-          const y = (window.innerHeight - e.clientY * speed) / 100
-            ; (particle as HTMLElement).style.transform = `translate(${x}px, ${y}px)`
-        })
-      }
-    }
-
-    window.addEventListener("mousemove", handleMouseMove)
-    return () => window.removeEventListener("mousemove", handleMouseMove)
-  }, [])
-
-  // Generate particles
-  useEffect(() => {
-    if (!particlesRef.current) return
-
-    const particlesContainer = particlesRef.current
-    particlesContainer.innerHTML = ""
-
-    for (let i = 0; i < 50; i++) {
-      const particle = document.createElement("div")
-      particle.className = "particle"
-      particle.dataset.speed = (Math.random() * 0.8 + 0.2).toString()
-
-      const size = Math.random() * 3 + 1
-      particle.style.width = `${size}px`
-      particle.style.height = `${size}px`
-
-      // Position randomly
-      particle.style.left = `${Math.random() * 100}%`
-      particle.style.top = `${Math.random() * 100}%`
-
-      // Random opacity
-      particle.style.opacity = (Math.random() * 0.5 + 0.1).toString()
-
-      // Random color - purple or gold
-      const isPurple = Math.random() > 0.7
-      particle.style.backgroundColor = isPurple ? "#8E44AD" : "#F1C40F"
-
-      particlesContainer.appendChild(particle)
-    }
-
-    setIsLoaded(true)
-  }, [])
-
-  // Sections data
-  const sections = [
-    {
-      id: "hero",
-      title: "dreampool.ai",
-      subtitle: "",
-      description:
-        "An AI game master that dynamically runs your adventure in any setting or ruleset. Play solo or with friends—whether on PC or even on the go. Have your adventure anywhere—just talk, listen, and let the AI bring your world to life.",
-      image: "https://i.ibb.co/JWY1Y8Zz/Sora-ezgif-com-video-to-gif-converter.gif",
-      position: "left",
-      badge: "NEW RELEASE",
-      stats: [
-        { label: "ADVENTURES", value: "Epic", icon: <Swords className="w-5 h-5" /> },
-        { label: "WORLDS", value: "Sprawling", icon: <Scroll className="w-5 h-5" /> },
-        { label: "LANGUAGES", value: "32 available", icon: <Users className="w-5 h-5" /> },
-      ],
-    },
-    {
-      id: "features",
-      title: "FORGE YOUR LEGEND",
-      subtitle: "",
-      description:
-        "From crafting intricate plot hooks to delivering emotive dialogue, our AI voice assistant brings unforgettable stories to life under your direction.",
-      image: "https://i.ibb.co/JWY1Y8Zz/Sora-ezgif-com-video-to-gif-converter.gif",
-      position: "right",
-      showFeatures: true,
-    },
-    {
-      id: "worldbuilding",
-      title: "EXPLORE EPIC REALMS",
-      subtitle: "",
-      description:
-        "Navigate sprawling cities, mysterious dungeons, and entire planes of existence. Our AI fleshes out every detail, from local customs to ancient artifacts.",
-      image: "https://i.ibb.co/JWY1Y8Zz/Sora-ezgif-com-video-to-gif-converter.gif",
-      position: "left",
-      badge: "WORLD BUILDER",
-      stats: [
-        { label: "POSSIBLE SETTINGS", value: "Dozens of", icon: <Wand2 className="w-5 h-5" /> },
-        { label: "CHARACTERS", value: "Unlmited", icon: <Users className="w-5 h-5" /> },
-        { label: "COMBAT SYSTEM", value: "Customized", icon: <Swords className="w-5 h-5" /> },
-      ],
-    },
-    // {
-    //   id: "community",
-    //   title: "JOIN THE GUILD",
-    //   subtitle: "",
-    //   description:
-    //     "Share your creations, get inspired by others, and collaborate on epic campaigns. Our community of DMs and players is here to support and elevate your dreampool experience.",
-    //   image: "https://images.ctfassets.net/swt2dsco9mfe/22Xj1YPLa19KYGAOGcAhbb/014bde378bc8e710eb15fb7fc99e5d0c/1920x1080-terrain-wa.jpg",
-    //   position: "center",
-    //   badge: "COMMUNITY",
-    //   videoUrl: "#",
-    // },
-  ]
+export default function LandingPage() {
+  const haiku = MODELS.find((m) => m.id === "haiku")!;
+  const sonnet = MODELS.find((m) => m.id === "sonnet")!;
+  const opus = MODELS.find((m) => m.id === "opus")!;
+  const priced = [haiku, sonnet, opus].map((m) => ({ m, typical: typicalTurnMicros(m.apiModel) }));
+  const freeTurns = Math.floor(SIGNUP_CREDIT_MICROS / priced[0].typical / 100) * 100;
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#1A0933]">
-      {/* Particles background */}
-      <div ref={particlesRef} className="fixed inset-0 z-10 pointer-events-none" />
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/70 backdrop-blur">
+        <nav aria-label="Main" className="mx-auto flex max-w-6xl items-center gap-6 px-5 py-3">
+          <Brand href="/" />
+          <div className="ml-auto hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+            <a href="#how" className="hover:text-foreground">How it works</a>
+            <a href="#storytellers" className="hover:text-foreground">Storytellers</a>
+            <a href="#pricing" className="hover:text-foreground">Pricing</a>
+            <a href="#faq" className="hover:text-foreground">FAQ</a>
+          </div>
+          <div className="ml-auto flex items-center gap-3 md:ml-0">
+            <Link href="/dashboard" className="hidden text-sm text-muted-foreground hover:text-foreground sm:inline">Sign in</Link>
+            <Link href="/dashboard" data-conversion="start-adventuring" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110">
+              Start adventuring
+            </Link>
+          </div>
+        </nav>
+      </header>
 
-      {/* Decorative elements */}
-      <div className="fixed top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#F1C40F] to-transparent opacity-70 z-50" />
-      <div className="fixed bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#8E44AD] to-transparent opacity-70 z-50" />
-
-      {isLoaded && (
-        <>
-          {/* Header */}
-          <div className="fixed top-0 left-0 w-full z-50 px-6 py-4">
-            <div className="flex justify-between items-center">
-              <div className="text-[#F1C40F] font-bold text-2xl flex items-center">
-                <div className="w-8 h-8 mr-2 relative">
-                  <div className="absolute inset-0 bg-[#F1C40F] rounded-full opacity-20 animate-pulse" />
-                  <div className="absolute inset-2 bg-[#F1C40F] rounded-full" />
-                </div>
-                <span className="relative">
-                  dreampool 
-                  <div className="absolute -bottom-1 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-[#F1C40F] to-transparent" />
-                </span>
-              </div>
-
-              
-
-              {/* biome-ignore lint/a11y/useButtonType: <explanation> */}
-              <button className="bg-[#8E44AD] hover:bg-[#9B59B6] text-white font-bold xl:px-6 xl:py-2 px-3 py-2 rounded relative group overflow-hidden" onClick={()=> router.push('/dashboard')}>
-                <span className="relative z-10">START ADVENTURING</span>
-                <div className="absolute inset-0 bg-[#F1C40F] transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-              {/* inicio */}
-              </button>
+      <main>
+        <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-14 lg:grid-cols-[1.1fr_1fr] lg:pt-24">
+          <div className="flex flex-col gap-6">
+            <h1 className="text-balance font-[family-name:var(--font-display)] text-5xl font-semibold leading-[1.02] sm:text-6xl lg:text-7xl">
+              Solo adventures, told by a storyteller who remembers.
+            </h1>
+            <p className="max-w-xl text-lg leading-relaxed text-muted-foreground">
+              Dreampool is an AI game master for one player. Pick a storyteller, create your character by talking, and play a
+              tabletop-style story that keeps your character sheet, quests and journal as you go.
+            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              <StartButton />
+              <p className="text-sm text-muted-foreground">
+                {formatUsd(SIGNUP_CREDIT_MICROS)} free to start · no subscription
+              </p>
             </div>
           </div>
+          <TablePreview />
+        </section>
 
-          {/* Main Swiper */}
-          <Swiper
-            direction="vertical"
-            slidesPerView={1}
-            spaceBetween={0}
-            mousewheel={true}
-            effect="fade"
-            speed={800}
-            pagination={{
-              clickable: true,
-              renderBullet: (index, className) =>
-                `<span class="${className} w-2 h-2 bg-[#F1C40F] rounded-full"></span>`,
-            }}
-            modules={[Mousewheel, EffectFade, Pagination]}
-            className="h-full w-full"
-            onSlideChange={(swiper) => setActiveIndex(swiper.activeIndex)}
-          >
-            {sections.map((section, index) => (
-              <SwiperSlide key={section.id} className="h-full w-full">
-                <div className="relative h-full w-full">
-                  {/* Background image with parallax effect */}
-                  <div className="absolute inset-0 z-0 overflow-hidden">
-                    <div
-                      className="absolute inset-0 scale-110"
-                      style={{
-                        transform: `scale(1.1) translate(${(mousePosition.x - window.innerWidth / 2) / 50}px, ${(mousePosition.y - window.innerHeight / 2) / 50}px)`,
-                        transition: "transform 0.2s ease-out",
-                      }}
-                    >
-                      <Image
-                        src={section.image || "/placeholder.svg"}
-                        alt={section.title}
-                        fill
-                        className="object-cover"
-                        priority
-                      />
-                    </div>
-                    <div className="absolute inset-0 bg-[#1A0933]/70" />
+        <section aria-labelledby="how-title" id="how" className="scroll-mt-20 border-t border-border/60 py-20">
+          <div className="mx-auto max-w-6xl px-5">
+            <SectionHeading id="how-title" eyebrow="How it works" title="Sit down, say who you are, and play." />
+            <ol className="grid gap-4 md:grid-cols-3">
+              {[
+                ["Choose a storyteller", "Each one has their own voice, style and pace. Pick the AI model they run on, too: faster and cheaper, or richer and slower."],
+                ["Create a character by talking", "Your storyteller asks who you want to be. Your answers fill in your character sheet: stats, gear, goals."],
+                ["Play at your own pace", "Act, talk, tap a suggested action or roll when it matters. Stop anytime; the next session opens where you left off."],
+              ].map(([title, body], i) => (
+                <li key={title} className="rounded-2xl border border-border bg-card/70 p-6">
+                  <span className="font-[family-name:var(--font-display)] text-4xl font-semibold text-primary">{i + 1}</span>
+                  <h3 className="mt-2 font-[family-name:var(--font-display)] text-2xl font-semibold">{title}</h3>
+                  <p className="mt-2 leading-relaxed text-muted-foreground">{body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
 
-                    {/* Decorative overlay */}
-                    <div className="absolute inset-0 bg-[url('/placeholder.svg?height=400&width=400')] bg-repeat opacity-5" />
-
-                    {/* Vignette effect */}
-                    <div className="absolute inset-0 bg-radial-gradient" />
+        <section aria-labelledby="st-title" id="storytellers" className="scroll-mt-20 py-20">
+          <div className="mx-auto max-w-6xl px-5">
+            <SectionHeading id="st-title" eyebrow="Storytellers" title="Who will tell your story?">
+              Four storytellers, four very different tables.
+            </SectionHeading>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {STORYTELLERS.map((s) => (
+                <article key={s.id} className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card" style={{ "--c": s.accentColor } as CSSProperties}>
+                  <div
+                    className="grid h-36 place-items-center"
+                    style={{ background: `radial-gradient(circle at 50% 55%, ${s.accentColor}88, transparent 60%), linear-gradient(#0b0e13, ${s.accentColor}55)` }}
+                    aria-hidden="true"
+                  >
+                    <span className="font-[family-name:var(--font-display)] text-7xl font-bold text-white/90">{s.name[0]}</span>
                   </div>
+                  <div className="flex flex-1 flex-col gap-2 p-5">
+                    <h3 className="font-[family-name:var(--font-display)] text-2xl font-semibold leading-tight">{s.name}</h3>
+                    <p className="text-sm text-muted-foreground">{s.tagline}</p>
+                    <p className="mt-auto border-l-2 pl-3 font-[family-name:var(--font-display)] italic" style={{ borderColor: s.accentColor }}>
+                      “{s.sampleLine}”
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
 
-                  {/* Content */}
-                  <AnimatePresence>
-                    {activeIndex === index && (
-                      <motion.div
-                        className={`absolute inset-0 z-10 flex flex-col justify-center items-${section.position} px-6 md:px-20`}
-                        initial={{ opacity: 0, y: 50 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -50 }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                      >
-                        <div className="max-w-2xl relative">
-                          {/* Decorative elements */}
-                          <div className="absolute -left-10 top-0 h-full w-1 bg-gradient-to-b from-transparent via-[#F1C40F] to-transparent opacity-70" />
-
-                          {/* Badge */}
-                          {section.badge && (
-                            <motion.div
-                              className="inline-block rounded-sm bg-[#2C3E50] border border-[#F1C40F] px-3 py-1 text-sm text-[#F1C40F] mb-4 relative overflow-hidden"
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.2, duration: 0.5 }}
-                            >
-                              <span className="relative z-10">{section.badge}</span>
-                              <div className="absolute inset-0 bg-[#F1C40F] opacity-10" />
-                              <div className="absolute -right-2 -top-2 w-10 h-10 bg-[#F1C40F] opacity-20 rounded-full" />
-                            </motion.div>
-                          )}
-
-                          {/* Subtitle */}
-                          <motion.div
-                            className="text-[#8E44AD] mb-2 font-medium relative"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.3, duration: 0.5 }}
-                          >
-                            <span className="relative">
-                              {section.subtitle}
-                              <div className="absolute -bottom-1 left-0 w-1/3 h-px bg-[#8E44AD] opacity-50" />
-                            </span>
-                          </motion.div>
-
-                          {/* Title */}
-                          <motion.h2
-                            className="text-4xl md:text-6xl lg:text-7xl font-bold text-[#FFF] mb-4 leading-tight relative glow-text-subtle"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.5, duration: 0.5 }}
-                          >
-                            {section.title}
-                          </motion.h2>
-
-                          {/* Description */}
-                          <motion.p
-                            className="text-[#ECF0F1] text-lg md:text-xl mb-8"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.7, duration: 0.5 }}
-                          >
-                            {section.description}
-                          </motion.p>
-
-                          {/* Stats */}
-                          {section.stats && (
-                            <motion.div
-                              className="grid grid-cols-3 gap-4 mb-8"
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.8, duration: 0.5 }}
-                            >
-                              {section.stats.map((stat, i) => (
-                                <div
-                                  key={stat.label}
-                                  className="bg-[#2C3E50]/80 border border-[#F1C40F]/30 p-3 rounded-sm flex flex-col items-center"
-                                >
-                                  <div className="text-[#F1C40F] mb-1">{stat.icon}</div>
-                                  <div className="text-[#FFF] font-bold text-xl">{stat.value}</div>
-                                  <div className="text-[#ECF0F1] text-xs">{stat.label}</div>
-                                </div>
-                              ))}
-                            </motion.div>
-                          )}
-
-                          {/* AI Features showcase */}
-                          {section.showFeatures && (
-                            <motion.div
-                              className="mb-8 overflow-hidden"
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.8, duration: 0.5 }}
-                            >
-                              <div className="flex space-x-4 py-4">
-                                {aiFeatures.map((feature) => (
-                                  <div
-                                    key={feature.name}
-                                    className="relative group"
-                                    onMouseEnter={() => setHoveredFeature(feature.name)}
-                                    onMouseLeave={() => setHoveredFeature(null)}
-                                  >
-                                    <div
-                                      className={`w-24 h-32 md:w-32 md:h-44 relative overflow-hidden border-2 transition-all duration-300 ${hoveredFeature === feature.name ? "border-[#8E44AD]" : "border-[#F1C40F]/50"}`}
-                                    >
-                                      <Image
-                                        src={feature.image || "/placeholder.svg"}
-                                        alt={feature.name}
-                                        fill
-                                        className="object-cover transition-transform duration-500 group-hover:scale-110"
-                                      />
-                                      <div className="absolute inset-0 bg-gradient-to-t from-[#1A0933] to-transparent" />
-
-                                      <div className="absolute bottom-0 left-0 w-full p-2 text-center">
-                                        <div className="text-xs text-[#ECF0F1]">{feature.description}</div>
-                                        <div className="text-sm font-bold text-[#FFF]">{feature.name}</div>
-                                      </div>
-                                    </div>
-
-                                    {/* Hover effect */}
-                                    <div
-                                      className={'absolute -inset-px bg-[#8E44AD] opacity-0 group-hover:opacity-20 transition-opacity duration-300 pointer-events-none'}
-                                    />
-
-                                    {/* Bottom glow */}
-                                    <div
-                                      className={'absolute -bottom-1 left-0 w-full h-1 bg-[#8E44AD] opacity-0 group-hover:opacity-70 transition-opacity duration-300'}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </motion.div>
-                          )}
-
-                          {/* Video preview */}
-                          
-
-                          {/* Buttons */}
-                          <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.9, duration: 0.5 }}
-                            className="relative"
-                          >
-                            {/* biome-ignore lint/a11y/useButtonType: <explanation> */}
-                           
-
-                            {/* biome-ignore lint/a11y/useButtonType: <explanation> */}
-                           
-
-                            {/* Decorative corner */}
-                            <div className="absolute -bottom-6 -left-6 w-12 h-12">
-                              <div className="absolute top-0 right-0 w-6 h-1 bg-[#F1C40F]/30" />
-                              <div className="absolute top-0 right-0 w-1 h-6 bg-[#F1C40F]/30" />
-                            </div>
-                          </motion.div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
-
-          {/* Scroll indicator */}
-          {activeIndex === 0 && (
-            <motion.div
-              className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50 text-[#F1C40F] flex flex-col items-center"
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 1,
-                repeat: Number.POSITIVE_INFINITY,
-                repeatType: "reverse",
-              }}
-            >
-              <span className="text-xs mb-2 text-[#ECF0F1]">SCROLL TO EXPLORE</span>
-              <ChevronDown size={32} />
-            </motion.div>
-          )}
-
-          {/* Side navigation */}
-          <div className="fixed right-6 top-1/2 transform -translate-y-1/2 z-50 hidden md:block">
-            <div className="flex flex-col gap-6">
-              {sections.map((section, index) => (
-                // biome-ignore lint/a11y/useKeyWithClickEvents: <explanation>
-                <div
-                  key={section.id}
-                  className={` rounded-full cursor-pointer transition-all duration-300 relative group ${activeIndex === index ? "bg-[#F1C40F]" : "bg-[#F1C40F]/30 hover:bg-[#F1C40F]/50"}`}
-                  onClick={() =>
-                    document
-                      .querySelector(`.swiper-pagination-bullet:nth-child(${index + 1})`)
-                      ?.dispatchEvent(new Event("click"))
-                  }
-                >
-                  {/* Label that appears on hover */}
-                  {/* <div className="absolute right-full mr-4 top-1/2 transform -translate-y-1/2 whitespace-nowrap bg-[#2C3E50] text-[#F1C40F] text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    {section.id.toUpperCase()}
-                  </div> */}
-
-                  
-                  {/* {activeIndex === index && (
-                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-px h-10 bg-gradient-to-b from-[#F1C40F] to-transparent" />
-                  )} */}
+        <section aria-labelledby="feat-title" className="border-t border-border/60 py-20">
+          <div className="mx-auto max-w-6xl px-5">
+            <SectionHeading id="feat-title" eyebrow="Features" title="Everything a good table needs." />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {FEATURES.map(({ icon: Icon, title, body }) => (
+                <div key={title} className="rounded-2xl border border-border bg-card/70 p-6">
+                  <Icon className="h-6 w-6 text-primary" aria-hidden="true" />
+                  <h3 className="mt-3 font-[family-name:var(--font-display)] text-xl font-semibold">{title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
                 </div>
               ))}
             </div>
           </div>
+        </section>
 
-        
+        <section aria-labelledby="price-title" id="pricing" className="scroll-mt-20 py-20">
+          <div className="mx-auto max-w-4xl px-5">
+            <SectionHeading id="price-title" eyebrow="Pricing" title="Pay for what you play.">
+              No subscription. Add funds when you need them, from ${MIN_TOPUP_CENTS / 100}. Each turn costs what it takes to run, plus {Math.round(MARKUP * 100)}%.
+            </SectionHeading>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {priced.map(({ m, typical }) => (
+                <div key={m.id} className={`rounded-2xl border p-6 ${m.id === "haiku" ? "border-primary bg-primary/10" : "border-border bg-card/70"}`}>
+                  <p className="text-sm text-muted-foreground">{m.id === "haiku" ? "Default" : " "}</p>
+                  <h3 className="font-[family-name:var(--font-display)] text-2xl font-semibold">{m.name.replace("Claude ", "")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{m.tagline}</p>
+                  <p className="mt-4 font-mono text-2xl tabular-nums">~{formatUsd(typical)}</p>
+                  <p className="text-xs text-muted-foreground">per typical turn</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-6 text-center text-muted-foreground">
+              New players get <span className="text-foreground">{formatUsd(SIGNUP_CREDIT_MICROS)}</span> free: about {freeTurns.toLocaleString("en-US")} turns on Haiku.
+              You can switch models anytime.
+            </p>
+          </div>
+        </section>
 
-         
-        </>
-      )}
+        <section aria-labelledby="faq-title" id="faq" className="scroll-mt-20 border-t border-border/60 py-20">
+          <div className="mx-auto max-w-3xl px-5">
+            <SectionHeading id="faq-title" eyebrow="FAQ" title="Questions, answered." />
+            <div className="flex flex-col gap-3">
+              {[
+                ["Is this Dungeons & Dragons?", "Dreampool isn't affiliated with Wizards of the Coast. Its rules are compatible with fifth edition, based on the openly licensed SRD, and it works with any setting you like."],
+                ["Can I play with friends?", "Not yet. Dreampool is built for one player at a time today. Playing together is on our roadmap."],
+                ["Can I talk instead of type?", "Voice play is paused for maintenance while we move to our new storyteller. Text play works now, and voice will return with a distinct voice for every character."],
+                ["What happens to my story?", "It's saved as you play: your character, quests, the people you've met and a journal entry for every session. You can download your save file and import it again later."],
+                ["How much does it cost?", `Each turn is charged at what it costs us to run plus ${Math.round(MARKUP * 100)}%. On the default model that's a fraction of a cent. You start with ${formatUsd(SIGNUP_CREDIT_MICROS)} free and add funds from $${MIN_TOPUP_CENTS / 100} when you need more.`],
+              ].map(([q, a]) => (
+                <details key={q} className="group rounded-xl border border-border bg-card/70 px-5 py-4 open:bg-card">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
+                    {q}
+                    <span className="text-muted-foreground transition group-open:rotate-45" aria-hidden="true">+</span>
+                  </summary>
+                  <p className="mt-2 leading-relaxed text-muted-foreground">{a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-24">
+          <div className="mx-auto flex max-w-3xl flex-col items-center gap-6 px-5 text-center">
+            <h2 className="text-balance font-[family-name:var(--font-display)] text-4xl font-semibold sm:text-5xl">The table is set.</h2>
+            <p className="text-lg text-muted-foreground">Your storyteller is waiting. It takes a minute to start.</p>
+            <StartButton />
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-border/60 py-8">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 text-sm text-muted-foreground">
+          <Brand href="/" />
+          <p>Not affiliated with Wizards of the Coast. Game rules are compatible with the System Reference Document 5.1 (CC-BY-4.0).</p>
+          <p>© {new Date().getFullYear()} Dreampool</p>
+        </div>
+      </footer>
     </div>
-  )
+  );
 }

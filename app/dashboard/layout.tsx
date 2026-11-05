@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import "@/app/globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
-import AdSense from "@/components/AdSense";
+import { clerkAppearance } from "@/lib/clerkAppearance";
+import GoogleTag from "@/components/GoogleTag";
 import { bodyFont, displayFont } from "@/lib/fonts";
 import { ToasterProvider } from "@/lib/ToasterProvider";
 import { Header } from "./components/Header";
@@ -15,10 +16,10 @@ export const metadata: Metadata = {
 
 export default function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider appearance={clerkAppearance}>
       <html lang="en" className="dark">
         <head>
-          <AdSense />
+          <GoogleTag />
         </head>
         <body className={`${bodyFont.variable} ${displayFont.variable} dp-night font-[family-name:var(--font-body)] text-foreground antialiased`}>
           <ToasterProvider />

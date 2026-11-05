@@ -11,43 +11,22 @@
 import mongoose from "mongoose";
 import { formatUsd } from "../lib/billing/money";
 import { MARKUP } from "../lib/billing/pricing";
+import { monthlyReport } from "../lib/billing/report";
 import { getMongoStores, LedgerModel, WalletModel } from "../lib/save/mongoStore";
 
 async function report(month: string) {
-  const start = new Date(`${month}-01T00:00:00Z`);
-  if (Number.isNaN(start.getTime())) throw new Error("Use --month=YYYY-MM");
-  const end = new Date(start);
-  end.setUTCMonth(end.getUTCMonth() + 1);
-
-  const rows = await LedgerModel.aggregate<{ _id: string; amount: number; provider: number; count: number }>([
-    { $match: { createdAt: { $gte: start, $lt: end } } },
-    { $group: { _id: "$kind", amount: { $sum: "$amountMicros" }, provider: { $sum: { $ifNull: ["$meta.providerMicros", 0] } }, count: { $sum: 1 } } },
-  ]);
-  const by = Object.fromEntries(rows.map((r) => [r._id, r]));
-  const charged = -(by.charge?.amount ?? 0);
-  const provider = by.charge?.provider ?? 0;
-  const perModel = await LedgerModel.aggregate<{ _id: string; charged: number; provider: number; turns: number }>([
-    { $match: { kind: "charge", createdAt: { $gte: start, $lt: end } } },
-    { $group: { _id: "$meta.model", charged: { $sum: { $multiply: ["$amountMicros", -1] } }, provider: { $sum: "$meta.providerMicros" }, turns: { $sum: 1 } } },
-    { $sort: { charged: -1 } },
-  ]);
-
-  console.log(`Billing report for ${month} (markup ${Math.round(MARKUP * 100)}%)`);
-  console.log(`  Top-ups:        ${formatUsd(by.topup?.amount ?? 0)} (${by.topup?.count ?? 0} payments, before Stripe fees)`);
-  console.log(`  Signup credit:  ${formatUsd(by.signup_grant?.amount ?? 0)} (${by.signup_grant?.count ?? 0} users)`);
-  console.log(`  Charged turns:  ${formatUsd(charged)} (${by.charge?.count ?? 0} turns)`);
-  console.log(`  Provider cost:  ${formatUsd(provider)}`);
-  console.log(`  Gross margin:   ${formatUsd(charged - provider)}`);
-  for (const m of perModel) {
-    console.log(`    ${m._id}: ${m.turns} turns, charged ${formatUsd(m.charged)}, cost ${formatUsd(m.provider)}, avg ${formatUsd(m.charged / Math.max(1, m.turns))}/turn`);
+  const r = await monthlyReport(month);
+  console.log(`Billing report for ${r.month} (markup ${Math.round(MARKUP * 100)}%)`);
+  console.log(`  Top-ups:        ${formatUsd(r.topups.micros)} (${r.topups.count} payments, before Stripe fees)`);
+  console.log(`  Signup credit:  ${formatUsd(r.signupCredit.micros)} (${r.signupCredit.count} users)`);
+  console.log(`  Coin conversion:${formatUsd(r.conversions.micros)} (${r.conversions.count} users)`);
+  console.log(`  Charged:        ${formatUsd(r.charged.micros)} (${r.charged.count} charges)`);
+  console.log(`  Provider cost:  ${formatUsd(r.providerMicros)}`);
+  console.log(`  Gross margin:   ${formatUsd(r.marginMicros)}`);
+  for (const m of r.byModel) {
+    console.log(`    ${m.model}: ${m.turns} charges, charged ${formatUsd(m.chargedMicros)}, cost ${formatUsd(m.providerMicros)}`);
   }
-  const openHolds = await LedgerModel.aggregate<{ _id: null; n: number }>([
-    { $match: { kind: { $in: ["hold", "release"] } } },
-    { $group: { _id: { $arrayElemAt: [{ $split: ["$_id", ":"] }, 1] }, sum: { $sum: "$amountMicros" } } },
-    { $match: { sum: { $ne: 0 } } },
-    { $count: "n" },
-  ]);
-  if (openHolds[0]?.n) console.log(`  Warning: ${openHolds[0].n} hold(s) never released (crashed turns). Run reconcile, then refund them with an adjustment.`);
+  if (r.openHolds) console.log(`  Note: ${r.openHolds} hold(s) not yet released (turns in progress, or crashed turns waiting for the player's next turn).`);
 }
 
 async function reconcile(fix: boolean) {

@@ -76,7 +76,7 @@ Setup and operations:
    yarn billing:convert-coins
    yarn billing:convert-coins --apply
    ```
-3. Monthly: `yarn billing report --month=YYYY-MM` shows top-ups, charges, provider cost and margin per model. Compare the provider cost with the Anthropic Console's usage page; a gap means `pricing.ts` needs new rates. `yarn billing reconcile` checks balances against the ledger (`--fix` corrects them).
+3. Monthly: the admin **Billing** page (or `yarn billing report --month=YYYY-MM`) shows top-ups, charges, provider cost and margin per model. Compare the provider cost with the Anthropic Console's usage page; a gap means `pricing.ts` needs new rates. `yarn billing reconcile` checks balances against the ledger (`--fix` corrects them).
 
 Checks: `yarn test` (unit tests), `yarn typecheck`, `yarn lint`.
 
@@ -118,7 +118,7 @@ All require a signed-in user. **Admin** means the user's Clerk id is in `ADMIN_U
 |---|---|
 | `/api/user` | The signed-in user's profile and balance |
 | `/api/admin` | `GET ?me=1`: am I an admin? (anyone). Everything else: admin |
-| `/api/token` | Legacy coin-package config: admin |
+| `/api/admin/billing` | Monthly billing report (the admin Billing page): admin |
 | `/api/products`, `/api/collections` (+ `/[id]`) | Read: anyone signed in. Create, edit, delete: admin |
 | `/api/orders` (+ `/[orderId]`, `/customers/[customerId]`) | Admin |
 | `/api/search/[query]`, `/api/products/[productId]/related` | Anyone signed in |
