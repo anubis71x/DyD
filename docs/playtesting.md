@@ -4,6 +4,8 @@
 
 Needs `ANTHROPIC_API_KEY` (environment or `.env.local`). Requests go to `https://api.anthropic.com`; set `PLAYTEST_BASE_URL` to use another endpoint. `ANTHROPIC_BASE_URL` is ignored on purpose.
 
+Test on Haiku 5.5 first: it's the default model and what most players use, and a 30-turn game costs about a cent. Sonnet costs about 15x as much and Opus about 35x, so only spot-check them, with the script and a few turns, after a prompt or engine change. Run the full Haiku suite before that. (The first five rounds spent $3.40 on Opus, $1.57 on Sonnet and $0.14 on Haiku.)
+
 ```bash
 yarn play                                         # interactive, Haiku 5.5, Eldrath
 yarn play --model sonnet --storyteller lyra
