@@ -261,6 +261,7 @@ Vapi is removed and voice play is paused. Text play runs on the new stack:
 - Reliability: one turn per campaign at a time via a database lock (works across server instances); holds left by a crashed turn are released automatically after 15 minutes.
 - Phase 2b (design system): one dark theme for the whole signed-in app (shared tokens, Cormorant + Figtree, calm static background), Dreampool brand mark, labeled navigation that also works on phones, a balance pill with Add funds, and a new home page with a Continue card. Landing page and admin pages still use their older styling.
 - Play is voice and text together: replies are read aloud with device voices (on by default, mutable) while talking is paused; player feedback on lines, characters, voices and the storyteller, delivered at the next turn without interrupting the current one, with instant voice recasts.
+- Playtesting: `yarn play` runs real games in the terminal and audits each turn (`docs/playtesting.md`). Five rounds on all three models fixed tool errors, repeated and missing narration and voiceless characters, and showed the per-turn estimate was 2–3x real cost (now corrected). Players can set reply length (Brief / Standard / Rich).
 - Multiplayer: planned in `docs/multiplayer-plan.md` (recommended after voice; save-file party model first).
 - Not yet: an image provider, ambience audio, voice, Next/React/Clerk upgrade (Phase 6), legacy route cleanup after migration (Phase 5).
 

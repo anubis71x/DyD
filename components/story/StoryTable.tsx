@@ -7,12 +7,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useStorySession, type DiceView, type FeedbackPayload, type FeedLine, type StoryState } from "@/hooks/use-story-session";
 import type { SaveFile } from "@/lib/save/schema";
 import { DEFAULT_MODEL_ID, getModel } from "@/lib/storyteller/models";
+import { getReplyLength } from "@/lib/storyteller/replyLength";
 import { getStoryteller } from "@/lib/storyteller/storytellers";
 import { voiceLabel } from "@/lib/storyteller/voices";
 import type { TurnInput } from "@/lib/storyteller/events";
 import { AddFundsDialog } from "@/components/billing/AddFunds";
 import { formatUsd } from "@/lib/billing/money";
-import { ModelSelect, perTurn } from "./ModelPicker";
+import { ModelSelect, perTurn, ReplyLengthSelect } from "./ModelPicker";
 import { FeedbackPanel, type FeedbackTarget } from "./FeedbackPanel";
 import { useReadAloud } from "./useReadAloud";
 import { AccentScope, Chip, npcColor, Portrait } from "./ui";
@@ -571,7 +572,7 @@ const RAIL: { key: DrawerKey; label: string; path: string }[] = [
 
 export function StoryTable({ campaignId }: { campaignId: string }) {
   const readAloud = useReadAloud();
-  const { state, send: sendTurn, setModel, endSession, sendFeedback, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId, { onEvent: readAloud.onEvent });
+  const { state, send: sendTurn, setModel, setReplyLength, endSession, sendFeedback, refreshBalance, clearChanged, dismissError } = useStorySession(campaignId, { onEvent: readAloud.onEvent });
   // Feedback never touches the turn: no busy state, no lock, no interruption of speech.
   const [feedback, setFeedback] = useState<FeedbackTarget | null>(null);
   const [rated, setRated] = useState<Record<number, "up" | "down">>({});
@@ -643,6 +644,7 @@ export function StoryTable({ campaignId }: { campaignId: string }) {
           <span className="text-xs text-zinc-500">{state.sessionNo ? `Session ${state.sessionNo} · ` : ""}told by {st.name}</span>
         </div>
         <div className="flex-1" />
+        <ReplyLengthSelect value={getReplyLength(save.preferences.replyLength)} onChange={setReplyLength} disabled={state.busy} />
         <ModelSelect value={save.modelId ?? DEFAULT_MODEL_ID} onChange={setModel} disabled={state.busy} />
         <button
           type="button"

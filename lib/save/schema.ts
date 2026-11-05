@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MODEL_IDS } from "@/lib/storyteller/models";
+import { REPLY_LENGTHS } from "@/lib/storyteller/replyLength";
 
 /**
  * Dreampool save file, version 1.
@@ -120,6 +121,8 @@ export const SaveFileSchema = z.object({
     tone: shortText.optional(),
     pacing: shortText.optional(),
     interactionStyle: shortText.optional(),
+    /** How long the storyteller's replies are (player setting). Missing = standard. */
+    replyLength: z.enum(REPLY_LENGTHS).optional(),
     contentBoundaries: z.array(shortText),
   }),
   memory: z.object({
@@ -233,6 +236,7 @@ export const SaveEventSchema = z.discriminatedUnion("type", [
         tone: shortText,
         pacing: shortText,
         interactionStyle: shortText,
+        replyLength: z.enum(REPLY_LENGTHS),
         contentBoundaries: z.array(shortText),
       })
       .partial(),

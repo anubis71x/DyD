@@ -3,7 +3,9 @@ import { z } from "zod";
 import { handle, HttpError, requireUser } from "@/lib/api/http";
 import { getMongoStores } from "@/lib/save/mongoStore";
 import { commitEvents, loadCampaign } from "@/lib/save/service";
+import type { SaveEvent } from "@/lib/save/schema";
 import { MODEL_IDS } from "@/lib/storyteller/models";
+import { REPLY_LENGTHS } from "@/lib/storyteller/replyLength";
 import { sessionLines } from "@/lib/storyteller/recap";
 
 export const dynamic = "force-dynamic";
@@ -35,13 +37,18 @@ export const DELETE = handle("campaign_DELETE", async (_req: Request, { params }
   return new NextResponse(null, { status: 204 });
 });
 
-const PatchBody = z.object({ modelId: z.enum(MODEL_IDS) });
+const PatchBody = z
+  .object({ modelId: z.enum(MODEL_IDS).optional(), replyLength: z.enum(REPLY_LENGTHS).optional() })
+  .refine((b) => b.modelId || b.replyLength);
 
-/** Change campaign settings. Currently: which model the storyteller runs on. */
+/** Change campaign settings: which model the storyteller runs on, and how long its replies are. */
 export const PATCH = handle("campaign_PATCH", async (req: NextRequest, { params }: Ctx) => {
   const userId = requireUser();
   const body = PatchBody.safeParse(await req.json().catch(() => null));
-  if (!body.success) throw new HttpError(400, "Choose one of the available models.");
-  const save = await commitEvents(await getMongoStores(), userId, params.campaignId, [{ type: "campaign.model", modelId: body.data.modelId }], "user");
+  if (!body.success) throw new HttpError(400, "Choose one of the available models or reply lengths.");
+  const events: SaveEvent[] = [];
+  if (body.data.modelId) events.push({ type: "campaign.model", modelId: body.data.modelId });
+  if (body.data.replyLength) events.push({ type: "preferences.update", patch: { replyLength: body.data.replyLength } });
+  const save = await commitEvents(await getMongoStores(), userId, params.campaignId, events, "user");
   return NextResponse.json({ save });
 });

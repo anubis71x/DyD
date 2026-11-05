@@ -31,7 +31,10 @@ describe("playtest audit", () => {
 
   it("flags markdown, long replies and invented rolls", () => {
     expect(codes(auditStyle("**Bold** move."))).toContain("style.markdown");
-    expect(codes(auditStyle("One. ".repeat(12)))).toContain("style.long");
+    const words = (n: number) => "word ".repeat(n).trim() + ".";
+    expect(codes(auditStyle(words(170)))).toContain("style.long");
+    expect(codes(auditStyle(words(170), "rich"))).not.toContain("style.long");
+    expect(codes(auditStyle(words(90), "brief"))).toContain("style.long");
     expect(codes(auditStyle("You rolled a 17 and the lock clicks."))).toContain("dice.invented");
     expect(auditStyle("The door creaks open. Cold air.")).toEqual([]);
   });

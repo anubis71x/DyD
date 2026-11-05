@@ -10,13 +10,15 @@
  *   yarn play --script tests/playtest/heist.txt --model haiku
  *   yarn play --bot 20 --compact-at 12000      Force compaction early to test it
  *   yarn play --bot 8 --sessions 2             End the session, check the recap and the "previously on…" opener
+ *   yarn play --bot 10 --length rich           Reply length: brief | standard | rich (the player's dial)
  *
  * Input lines (typed, from --script, or by the bot):
  *   any text        a turn                 /1 … /4      pick an offered choice
  *   /roll [d20+3]   roll (the pending check if there is one)
  *   /end            end the session (writes the journal recap)
  *   /compact        compact the session now
- *   /model haiku|sonnet|opus   switch model     /state   print the save file
+ *   /model haiku|sonnet|opus   switch model     /length brief|standard|rich
+ *   /state          print the save file
  *   /cost           costs so far            /quit
  *
  * Output goes to .playtest/<run>/: log.jsonl (every event and call),
@@ -39,6 +41,7 @@ import { commitEvents, createCampaign, loadCampaign } from "../lib/save/service"
 import { compactSession, ENGINE_CONFIG, endSession, runTurn } from "../lib/storyteller/engine";
 import type { TableEvent, TurnInput } from "../lib/storyteller/events";
 import { getModel, MODEL_IDS, type ModelId } from "../lib/storyteller/models";
+import { getReplyLength, REPLY_LENGTHS, type ReplyLength } from "../lib/storyteller/replyLength";
 import { NARRATOR } from "../lib/storyteller/sayParser";
 import { getStoryteller, STORYTELLERS } from "../lib/storyteller/storytellers";
 import { sessionLines } from "../lib/storyteller/recap";
@@ -52,6 +55,7 @@ const { values: args } = parseArgs({
     script: { type: "string" },
     sessions: { type: "string", default: "1" },
     "compact-at": { type: "string" },
+    length: { type: "string", default: "standard" },
     out: { type: "string" },
     quiet: { type: "boolean", default: false },
   },
@@ -74,6 +78,10 @@ if (!STORYTELLERS.some((s) => s.id === args.storyteller)) {
   process.exit(1);
 }
 if (args["compact-at"]) ENGINE_CONFIG.compactAtTokens = Number(args["compact-at"]);
+if (!(REPLY_LENGTHS as readonly string[]).includes(args.length!)) {
+  console.error(`--length must be one of ${REPLY_LENGTHS.join(", ")}`);
+  process.exit(1);
+}
 
 const runId = args.out ?? `${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}-${args.model}-${args.storyteller}`;
 const outDir = join(".playtest", runId);
@@ -304,6 +312,15 @@ async function play(line: string): Promise<boolean> {
     }
     return true;
   }
+  const ml = /^\/length\s+(\w+)/.exec(t);
+  if (ml) {
+    if (!(REPLY_LENGTHS as readonly string[]).includes(ml[1])) console.log(red(`Unknown length ${ml[1]}`));
+    else {
+      await commitEvents(stores, OWNER, campaignId, [{ type: "preferences.update", patch: { replyLength: ml[1] as ReplyLength } }], "user");
+      console.log(green(`Reply length: ${ml[1]}`));
+    }
+    return true;
+  }
   const choice = /^\/([1-4])$/.exec(t);
   if (choice) {
     const c = choices[Number(choice[1]) - 1];
@@ -375,6 +392,7 @@ async function turn(input: TurnInput, label: string) {
     before,
     save,
     toolErrors,
+    getReplyLength(before.preferences.replyLength),
   );
   for (const c of tc) if (c.servedModel && !c.servedModel.startsWith(c.model)) findings.push({ severity: "info", code: "model.fallback", detail: `asked ${c.model}, served ${c.servedModel}` });
   const last = tc[tc.length - 1];
@@ -480,6 +498,7 @@ function report(): string {
 
   return `# Playtest ${runId}
 
+- Reply length: ${args.length}
 - Model: ${getModel(args.model).name}${modelId !== args.model ? ` (switched to ${getModel(modelId).name})` : ""} · storyteller: ${st.name}
 - Turns: ${real.length} · sessions: ${Math.max(0, ...turns.map((t) => t.sessionNo))} · compactAtTokens: ${ENGINE_CONFIG.compactAtTokens.toLocaleString()}
 
@@ -539,6 +558,9 @@ async function finish() {
 async function main() {
   campaign = await createCampaign(stores, OWNER, { title: "Playtest", storytellerId: args.storyteller!, modelId: args.model as ModelId });
   campaignId = campaign.campaignId;
+  if (args.length !== "standard") {
+    campaign = await commitEvents(stores, OWNER, campaignId, [{ type: "preferences.update", patch: { replyLength: args.length as ReplyLength } }], "user");
+  }
   const sessionsWanted = Math.max(1, Number(args.sessions));
   try {
     await turn({ type: "begin" }, "/begin");

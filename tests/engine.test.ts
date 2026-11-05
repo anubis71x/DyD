@@ -170,6 +170,20 @@ describe("runTurn", () => {
     expect(requests[1].messages.at(-1).content[0].content).toContain("Write your full reply now");
   });
 
+  it("tells the storyteller the reply length at the start, and again only when the player changes it", async () => {
+    const { stores, campaign } = await setup();
+    const { client, requests } = fakeClient([say("One."), say("Two."), say("Three.")]);
+    const deps = { stores, client, emit: () => {} };
+    const texts = (i: number) => requests[i].messages.at(-1).content.map((b: any) => b.text ?? "").join("\n");
+    await runTurn("u", campaign.campaignId, { type: "begin" }, deps);
+    expect(texts(0)).toContain("<table_settings>Reply length: standard</table_settings>");
+    await commitEvents(stores, "u", campaign.campaignId, [{ type: "preferences.update", patch: { replyLength: "rich" } }], "user");
+    await runTurn("u", campaign.campaignId, { type: "text", text: "Look around" }, deps);
+    expect(texts(1)).toContain("<table_settings>Reply length: rich</table_settings>");
+    await runTurn("u", campaign.campaignId, { type: "text", text: "Go on" }, deps);
+    expect(texts(2)).not.toContain("table_settings");
+  });
+
   it("charges nothing and keeps history valid when the API fails before any output", async () => {
     const { stores, campaign, _debug } = await setup(2 * USD);
     const { APIError } = await import("@anthropic-ai/sdk");

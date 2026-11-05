@@ -11,9 +11,10 @@ yarn play --script scripts/playtests/harbor.txt --model opus   # same inputs on 
 yarn play --bot 12 --model haiku                  # a Haiku "player" plays 12 turns
 yarn play --bot 8 --sessions 2                    # end the session, check the recap and the next opener
 yarn play --bot 20 --compact-at 12000             # force compaction early
+yarn play --bot 10 --length rich                  # reply length: brief | standard | rich
 ```
 
-In a game, type a line to act, `/1`–`/4` to pick a choice, `/roll` to roll the pending check, `/end` to end the session and write the journal, `/compact` to compact now, `/model opus` to switch, `/state` for the save file, `/cost` for spend so far, `/quit` to stop.
+In a game, type a line to act, `/1`–`/4` to pick a choice, `/roll` to roll the pending check, `/end` to end the session and write the journal, `/compact` to compact now, `/model opus` to switch, `/length rich` to change the reply length, `/state` for the save file, `/cost` for spend so far, `/quit` to stop.
 
 Each run writes `.playtest/<run>/`:
 
@@ -72,6 +73,14 @@ Five rounds on Haiku 5.5, Sonnet 5.5 and Opus 5.5: the harbor script (12–13 tu
 Speaker tags were used correctly from the start: every `<say who>` id matched a cast character, with no nesting or broken tags. The final round had two `say.unknown_speaker` findings (an id that wasn't in the cast), not yet investigated.
 
 Recaps and compaction worked on every model: each run wrote one journal entry per session, compaction ran 1–3 times per bot game, and play continued from the carry-over without a greeting or recap.
+
+### Reply length (added after these rounds)
+
+Players now choose Brief, Standard or Rich replies on the play screen (default Standard), or ask for it in the game. The system prompt describes all three levels; the engine sends a one-line `<table_settings>` note at the start of each session or part and whenever the setting changes, so the prompt cache isn't disturbed. The audit's `style.long` limit follows the setting (80 / 160 / 320 words).
+
+The same change brought in the strongest parts of the old Vapi prompt: asking for a game style and dice preference before the first scene, danger matched to the style (no unearned deaths), an encounter checklist (goal, intentions, terrain, timer, reward, readable way out, a mid-encounter shift), letting characters talk in conversations, five-senses description, no flattery from strangers, and generous handling of speech-recognition errors.
+
+None of this has been playtested yet: the API account ran out of credit. Before shipping, run the harbor script on each model at `--length brief` and `--length rich`, and compare cost per turn with Standard (the Rich hint says it costs a little more).
 
 ### Still open
 

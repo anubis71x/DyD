@@ -1,4 +1,5 @@
 import type { SaveFile } from "@/lib/save/schema";
+import { REPLY_LENGTH_INFO, type ReplyLength } from "@/lib/storyteller/replyLength";
 import { NARRATOR, parseSay } from "@/lib/storyteller/sayParser";
 
 /**
@@ -75,14 +76,16 @@ export function auditSpeakerTags(text: string, save: SaveFile): Finding[] {
 }
 
 /** Style checks for text that is read aloud. */
-export function auditStyle(text: string): Finding[] {
+export function auditStyle(text: string, length: ReplyLength = "standard"): Finding[] {
   const out: Finding[] = [];
   const plain = text.replace(/<[^>]+>/g, "");
   if (MARKDOWN.test(plain)) out.push({ severity: "warn", code: "style.markdown", detail: clip(plain.match(MARKDOWN)![0]) });
   if (/\p{Extended_Pictographic}/u.test(plain)) out.push({ severity: "warn", code: "style.emoji", detail: "emoji in a spoken reply" });
   const w = words(plain);
   const s = sentences(plain);
-  if (w > 160 || s > 8) out.push({ severity: "warn", code: "style.long", detail: `${w} words, ${s} sentences (aim for 2–5 sentences)` });
+  const max = REPLY_LENGTH_INFO[length].maxWords;
+  if (w > max) out.push({ severity: "warn", code: "style.long", detail: `${w} words, ${s} sentences (over ${max} words for "${length}")` });
+  if (length === "rich" && w < 40 && s > 0) out.push({ severity: "info", code: "style.short", detail: `${w} words on "rich"` });
   if (INVENTED_ROLL.test(plain)) out.push({ severity: "warn", code: "dice.invented", detail: clip(plain.match(INVENTED_ROLL)![0]) });
   return out;
 }
@@ -96,14 +99,14 @@ export interface CallRecord {
  * Checks across one whole turn (every model call in it). `save` is the save
  * after the turn; `before` is the save before it.
  */
-export function auditTurn(calls: CallRecord[], before: SaveFile, save: SaveFile, toolErrors: string[]): Finding[] {
+export function auditTurn(calls: CallRecord[], before: SaveFile, save: SaveFile, toolErrors: string[], length: ReplyLength = "standard"): Finding[] {
   const out: Finding[] = [];
   const blocks = calls.flatMap((c) => c.content);
   const text = blocks.filter((b) => b.type === "text").map((b) => b.text ?? "").join("\n");
   const tools = blocks.filter((b) => b.type === "tool_use");
   const names = tools.map((t) => t.name ?? "");
 
-  out.push(...auditSpeakerTags(text, save), ...auditStyle(text));
+  out.push(...auditSpeakerTags(text, save), ...auditStyle(text, length));
   for (const e of toolErrors) out.push({ severity: "error", code: "tool.error", detail: e });
 
   // A new NPC should be added and cast in the same turn.

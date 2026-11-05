@@ -3,6 +3,7 @@
 import { formatUsd } from "@/lib/billing/money";
 import { typicalTurnMicros } from "@/lib/billing/pricing";
 import { getModel, MODELS, type ModelId } from "@/lib/storyteller/models";
+import { REPLY_LENGTH_INFO, REPLY_LENGTHS, type ReplyLength } from "@/lib/storyteller/replyLength";
 
 /** e.g. "about $0.0008 per turn" */
 export const perTurn = (id: ModelId | undefined) => `about ${formatUsd(typicalTurnMicros(getModel(id).apiModel))} per turn`;
@@ -51,6 +52,28 @@ export function ModelSelect({ value, onChange, disabled }: { value: ModelId; onC
         {MODELS.map((m) => (
           <option key={m.id} value={m.id}>
             {m.name.replace("Claude ", "")} · {perTurn(m.id)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** Reply-length dial for the play screen header. Takes effect from the next turn. */
+export function ReplyLengthSelect({ value, onChange, disabled }: { value: ReplyLength; onChange: (v: ReplyLength) => void; disabled?: boolean }) {
+  return (
+    <label className="inline-flex items-center gap-2 text-xs text-zinc-400" title={REPLY_LENGTH_INFO[value].hint}>
+      <span className="sr-only sm:not-sr-only">Replies</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value as ReplyLength)}
+        aria-label="Reply length"
+        className="rounded-full border border-white/10 bg-[#1c222d] px-3 py-1 text-xs text-zinc-200 focus:border-[color:var(--accent)] focus:outline-none disabled:opacity-50"
+      >
+        {REPLY_LENGTHS.map((l) => (
+          <option key={l} value={l} title={REPLY_LENGTH_INFO[l].hint}>
+            {REPLY_LENGTH_INFO[l].label}
           </option>
         ))}
       </select>

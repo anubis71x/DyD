@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Asset, SaveFile } from "@/lib/save/schema";
 import type { TableEvent, TranscriptLine, TurnInput } from "@/lib/storyteller/events";
 import type { ModelId } from "@/lib/storyteller/models";
+import type { ReplyLength } from "@/lib/storyteller/replyLength";
 
 /** What the feedback form sends (validated on the server by FeedbackInput). */
 export interface FeedbackPayload {
@@ -275,22 +276,25 @@ export function useStorySession(campaignId: string, opts: { onEvent?: (e: TableE
   const clearChanged = useCallback((key: keyof StoryState["changed"]) => {
     setState((s) => ({ ...s, changed: { ...s.changed, [key]: false } }));
   }, []);
-  const setModel = useCallback(
-    async (modelId: ModelId) => {
+  const patchCampaign = useCallback(
+    async (patch: { modelId?: ModelId; replyLength?: ReplyLength }, failure: string) => {
       const res = await fetch(`/api/campaigns/${campaignId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modelId }),
+        body: JSON.stringify(patch),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setState((s) => ({ ...s, error: { code: "http", message: body.error ?? "Couldn't switch models." } }));
+        setState((s) => ({ ...s, error: { code: "http", message: body.error ?? failure } }));
         return;
       }
       setState((s) => ({ ...s, save: body.save }));
     },
     [campaignId],
   );
+  const setModel = useCallback((modelId: ModelId) => patchCampaign({ modelId }, "Couldn't switch models."), [patchCampaign]);
+  /** Takes effect from the next turn. */
+  const setReplyLength = useCallback((replyLength: ReplyLength) => patchCampaign({ replyLength }, "Couldn't change the reply length."), [patchCampaign]);
   const endSession = useCallback(async () => {
     if (busyRef.current) return;
     busyRef.current = true;
@@ -361,5 +365,5 @@ export function useStorySession(campaignId: string, opts: { onEvent?: (e: TableE
     };
   }, [load, send]);
 
-  return { state, send, setModel, endSession, sendFeedback, refreshBalance, clearChanged, dismissHandout, dismissError };
+  return { state, send, setModel, setReplyLength, endSession, sendFeedback, refreshBalance, clearChanged, dismissHandout, dismissError };
 }

@@ -284,7 +284,7 @@ const TOOLS = [
 
   def({
     name: "set_preferences",
-    description: "Record what the player wants from the game: language, tone, pacing, play style, house rules, and content boundaries (topics to avoid, treated as hard limits).",
+    description: "Record what the player wants from the game: language, tone, pacing, play style, reply length, house rules, and content boundaries (topics to avoid, treated as hard limits).",
     inputSchema: {
       type: "object",
       properties: {
@@ -293,6 +293,7 @@ const TOOLS = [
         pacing: { type: "string" },
         game_style: { type: "string" },
         interaction_style: { type: "string" },
+        reply_length: { type: "string", enum: ["brief", "standard", "rich"], description: "Only when the player asks for shorter or longer replies" },
         content_boundaries: strArr("Topics to avoid"),
         house_rule: str("A rule the player and storyteller agreed on"),
       },
@@ -303,6 +304,7 @@ const TOOLS = [
       pacing: z.string().max(200).optional(),
       game_style: z.string().max(200).optional(),
       interaction_style: z.string().max(200).optional(),
+      reply_length: z.enum(["brief", "standard", "rich"]).optional(),
       content_boundaries: z.array(sname).optional(),
       house_rule: z.string().max(300).optional(),
     }),
@@ -313,6 +315,7 @@ const TOOLS = [
         ...(i.pacing ? { pacing: i.pacing } : {}),
         ...(i.game_style ? { gameStyle: i.game_style } : {}),
         ...(i.interaction_style ? { interactionStyle: i.interaction_style } : {}),
+        ...(i.reply_length ? { replyLength: i.reply_length } : {}),
         ...(i.content_boundaries ? { contentBoundaries: i.content_boundaries } : {}),
       };
       const events: SaveEvent[] = [];

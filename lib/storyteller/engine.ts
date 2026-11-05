@@ -21,6 +21,7 @@ import { hasStory, RECAP_MODEL, sessionLines, summarizeSession } from "./recap";
 import { SayParser } from "./sayParser";
 import { getStoryteller } from "./storytellers";
 import { feedbackBlock } from "./feedback";
+import { announcedReplyLength, getReplyLength, tableSettingsNote } from "./replyLength";
 import { sanitizePlayerText } from "./sanitize";
 import { runTool, TOOL_PARAMS } from "./tools";
 import { transcriptFromMessages } from "./transcript";
@@ -325,7 +326,12 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
 
   // The player's input is saved before the model is called.
   const content: BetaContentBlockParam[] = [];
-  if (opening) content.push({ type: "text", text: opening });
+  // The reply-length setting, whenever this conversation hasn't heard the current value yet
+  // (a new session or part always has; a mid-session change is sent once).
+  const replyLength = getReplyLength(save.preferences.replyLength);
+  const settings = announcedReplyLength(messages) !== replyLength ? tableSettingsNote(replyLength) : "";
+  if (opening) content.push({ type: "text", text: settings ? `${opening}\n\n${settings}` : opening });
+  else if (settings) content.push({ type: "text", text: settings });
   // Feedback the player gave since the last turn (it never interrupts a turn; it waits for this one).
   const feedback = await stores.feedback.pending(ownerId, campaignId);
   if (feedback.length) content.push({ type: "text", text: feedbackBlock(feedback, save) });
