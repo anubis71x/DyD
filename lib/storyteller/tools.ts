@@ -188,7 +188,7 @@ const TOOLS = [
       type: "object",
       properties: {
         name: str("Display name. Required for a new character"),
-        id: str("Existing id, when updating a known character"),
+        id: str("The character's id: for a new character, the one you will use in say tags (lowercase-with-dashes); for a known character, their existing id"),
         description: str("Appearance and role, one or two sentences"),
         disposition: { type: "string", enum: ["friendly", "neutral", "hostile"] },
         motivations: str("What they want"),

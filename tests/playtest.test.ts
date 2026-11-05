@@ -88,3 +88,11 @@ describe("tool fixes from playtests", async () => {
     expect(codes(auditTurn(calls, base, base, []))).toContain("reply.repeated");
   });
 });
+
+describe("update_npc ids", async () => {
+  const { runTool } = await import("@/lib/storyteller/tools");
+  it("creates a new character under the id the storyteller chose", () => {
+    const out = runTool("update_npc", { id: "collector-hask", name: "Hask", voice: "soft, precise" }, { save: base, now });
+    expect(out.events[0]).toMatchObject({ type: "npc.upsert", id: "collector-hask", name: "Hask" });
+  });
+});
