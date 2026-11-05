@@ -1,3 +1,4 @@
+import { adminGuard } from "@/lib/api/admin";
 import Customer from "@/lib/models/Customer";
 import Order from "@/lib/models/Order";
 import { connectToDB } from "@/lib/mongoDB";
@@ -6,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { format } from "date-fns";
 
 export const GET = async (req: NextRequest) => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     await connectToDB()
 

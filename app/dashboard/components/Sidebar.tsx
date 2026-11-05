@@ -2,27 +2,9 @@
 import { User, Home, Grid, Settings, FileText, BookMarkedIcon } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
-import axios from "axios"
+import { useIsAdmin } from "@/hooks/use-is-admin"
 export function Sidebar() {
-    const { data } = useQuery({
-        queryKey: ['infouser'],
-        queryFn: async () => {
-            const response = await axios.get('/api/user');
-            return response.data;
-        },
-        refetchInterval: 10000,
-        staleTime: 1000 * 60 * 5 // 5 minutos
-    })
-
-    const { data: adminData, isLoading: adminLoading, error: adminError } = useQuery({
-        queryKey: ['isAdmin'],
-        queryFn: async () => {
-            const res = await axios.get('/api/admin');
-            return res.data;
-        },
-    });
-    console.log("🚀 ~ Sidebar ~ adminData:", adminData)
+    const { isAdmin } = useIsAdmin()
 
     const [activeButton, setActiveButton] = useState('home')
     const router = useRouter()
@@ -70,7 +52,7 @@ export function Sidebar() {
                 <BookMarkedIcon size={24} />
             </button>
             {/* biome-ignore lint/suspicious/noExplicitAny: <explanation> */}
-            {adminData?.find((item: any) => item.userId === data?.userId) && (
+            {isAdmin && (
 
                 <button
                     className={`p-3 rounded-full ${activeButton === 'settings' ? 'bg-[#2A2A35]' : ''} text-gray-400 hover:text-white`}

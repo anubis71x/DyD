@@ -1,3 +1,4 @@
+import { adminGuard } from "@/lib/api/admin";
 import { connectToDB } from "@/lib/mongoDB";
 import { auth } from "@clerk/nextjs";
 import { NextRequest, NextResponse } from "next/server";
@@ -5,6 +6,8 @@ import { NextRequest, NextResponse } from "next/server";
 import Collection from "@/lib/models/Collection";
 
 export const POST = async (req: NextRequest) => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     const { userId } = auth()
 

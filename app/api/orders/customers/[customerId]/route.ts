@@ -1,3 +1,4 @@
+import { adminGuard } from "@/lib/api/admin";
 import Order from "@/lib/models/Order";
 import Product from "@/lib/models/Product";
 import { connectToDB } from "@/lib/mongoDB";
@@ -7,6 +8,8 @@ export const GET = async (
   req: NextRequest,
   { params }: { params: { customerId: string } }
 ) => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     await connectToDB();
 

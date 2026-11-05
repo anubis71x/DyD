@@ -1,9 +1,12 @@
+import { adminGuard } from "@/lib/api/admin";
 import { type NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/mongoDB';
 import Coin from '@/lib/models/token';
 
 // GET: Listar todas las transacciones de coins
 export const GET = async () => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     await connectToDB();
     const coins = await Coin.find();
@@ -16,6 +19,8 @@ export const GET = async () => {
 
 // POST: Crear una transacción de coins
 export const POST = async (req: NextRequest) => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     await connectToDB();
     const { userId, coins, usdValue } = await req.json();
@@ -32,6 +37,8 @@ export const POST = async (req: NextRequest) => {
 
 // PUT: Actualizar una transacción de coins por userId
 export const PUT = async (req: NextRequest) => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     await connectToDB();
     const { userId, coins, usdValue } = await req.json();
@@ -58,6 +65,8 @@ export const PUT = async (req: NextRequest) => {
 
 // DELETE: Eliminar una transacción de coins por userId
 export const DELETE = async (req: NextRequest) => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     await connectToDB();
     const { userId } = await req.json();

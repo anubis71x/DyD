@@ -1,3 +1,4 @@
+import { adminGuard } from "@/lib/api/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
 
@@ -32,6 +33,8 @@ export const POST = async (
   req: NextRequest,
   { params }: { params: { collectionId: string } }
 ) => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     const { userId } = auth();
 
@@ -72,6 +75,8 @@ export const DELETE = async (
   req: NextRequest,
   { params }: { params: { collectionId: string } }
 ) => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     const { userId } = auth();
 

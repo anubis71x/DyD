@@ -1,3 +1,4 @@
+import { adminGuard } from "@/lib/api/admin";
 import { auth } from "@clerk/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -6,6 +7,8 @@ import Product from "@/lib/models/Product";
 import Collection from "@/lib/models/Collection";
 
 export const POST = async (req: NextRequest) => {
+  const denied = await adminGuard();
+  if (denied) return denied;
   try {
     const { userId } = auth();
 

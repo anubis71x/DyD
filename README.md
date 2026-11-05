@@ -32,6 +32,7 @@ Environment (`.env.local`):
 | `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret of the Stripe webhook endpoint (see Billing) |
 | `CRON_SECRET` | Shared secret for the scheduled idle-session job (see Sessions) |
+| `ADMIN_USER_IDS` | Comma-separated Clerk user ids that are always admins (how you set up the first admin) |
 | `ANTHROPIC_API_KEY` | Claude API key for the storyteller |
 
 The old `NEXT_PUBLIC_VAPI_*` and `TRIEVE_*` variables are no longer used and can be deleted.
@@ -108,56 +109,27 @@ All routes require a signed-in Clerk user, and every read or write is scoped to 
 
 ---
 
-## 📡 API Endpoints Reference (legacy)
-All routes require authentication (`Clerk userId`) unless stated otherwise. All data is sent and received in JSON format.
+## 📡 Other API routes
 
-### `/api/characters`
-Create, update, fetch, and delete characters linked to a session.
+All require a signed-in user. **Admin** means the user's Clerk id is in `ADMIN_USER_IDS` or they have an admin record (managed at `/dashboard/admin`).
 
-### `/api/collections` & `/api/collections/[collectionId]`
-Create, retrieve, update and delete collections and their associated products.
+| Route | Access |
+|---|---|
+| `/api/user` | The signed-in user's profile and balance |
+| `/api/admin` | `GET ?me=1`: am I an admin? (anyone). Everything else: admin |
+| `/api/token` | Legacy coin-package config: admin |
+| `/api/products`, `/api/collections` (+ `/[id]`) | Read: anyone signed in. Create, edit, delete: admin |
+| `/api/orders` (+ `/[orderId]`, `/customers/[customerId]`) | Admin |
+| `/api/search/[query]`, `/api/products/[productId]/related` | Anyone signed in |
+| `/api/stripe/webhook` | Public, Stripe-signed |
+| `/api/cron/close-sessions` | Public, needs `CRON_SECRET` |
 
-### `/api/orders` & `/api/orders/[orderId]` & `/api/orders/customers/[customerId]`
-Manage order data and summaries, linked to customer records.
-
-### `/api/mechanicsTracking`
-CRUD operations for tracking combat, rules, and player mechanics.
-
-### `/api/npcsRelations`
-Manage relationships and dialogue history with NPCs per session.
-
-### `/api/playerPreferences`
-Store player tone, pacing, and boundary preferences for narrative balance.
-
-### `/api/products` & `/api/products/[productId]` & `/api/products/[productId]/related`
-Full product catalog support with rich filtering, editing, and linkage to collections.
-
-### `/api/quests`
-Track quest status, goals, NPCs, and narrative objectives.
-
-### `/api/search/[query]`
-Fuzzy search over product titles, tags, and categories.
-
-### `/api/sessions`
-Full session lifecycle management with aggregate data access.
-
-### `/api/stripe`
-Create checkout sessions and award points.
-
-### `/api/token`
-Track and update coin transactions per user.
-
-### `/api/user`
-Initialize or update user profile and point balance.
-
-### `/api/worldState`
-Track world evolution including locations, factions, events, and time flow.
+The old per-session routes (`/api/characters`, `/api/quest`, `/api/npcsRelations`, `/api/worldState`, `/api/mechanicsTracking`, `/api/playerPreferences`, `/api/sessions`) were removed: nothing calls them since the Vapi removal. Their data is still in MongoDB for `yarn migrate:legacy`.
 
 ---
 
 ## 🧠 Notes
-- All API endpoints require a Clerk session (`middleware.ts`).
-- The routes listed under "API Endpoints Reference" are the legacy per-session models. They are kept until the migration has run and will then be removed.
+- All API endpoints require a Clerk session (`middleware.ts`), except the Stripe webhook (Stripe-signed) and the cron job (`CRON_SECRET`).
 - Balances change only on the server, through the ledger. The browser can't set them.
 
 ---
