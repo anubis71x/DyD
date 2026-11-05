@@ -12,7 +12,7 @@ import { estimateTokens, holdMicros, MARKUP, responseCost, withMarkup, type Cost
 import { applyEvents } from "@/lib/save/reducer";
 import type { SaveEvent } from "@/lib/save/schema";
 import { commitEvents, loadCampaign } from "@/lib/save/service";
-import type { PlaySession, SessionUsage, Stores } from "@/lib/save/store";
+import type { PendingCheck, PlaySession, SessionUsage, Stores } from "@/lib/save/store";
 import { checkOutcome, describeRoll, DiceError, parseNotation, roll } from "./dice";
 import type { TableEvent, TurnInput } from "./events";
 import { getModel, type StorytellerModel } from "./models";
@@ -212,20 +212,43 @@ function validateInput(input: TurnInput): string | null {
   }
 }
 
-/** Turn the player's input into message text, rolling dice server-side. */
-function playerContent(input: TurnInput, deps: TurnDeps): string | null {
+/**
+ * Neutralize anything in player-supplied text that looks like the prompt's
+ * own markers, so a player can't fake a dice result, close their <player>
+ * tag, or pose as the save file or a recap.
+ */
+export function sanitizePlayerText(text: string, max: number): string {
+  return text
+    .slice(0, max)
+    .replace(/<\s*\/?\s*(player|save_file|this_session_so_far|last_session_recap|say)\b[^>]*>/gi, "")
+    .replace(/\[\s*dice\s*\]/gi, "(dice)")
+    .trim();
+}
+
+/**
+ * Turn the player's input into message text, rolling dice server-side. A roll
+ * answering the storyteller's check uses the server's record of that check
+ * (dice, DC, advantage); anything else is labeled a free roll.
+ */
+function playerContent(input: TurnInput, pending: PendingCheck | null | undefined, deps: TurnDeps): string | null {
   switch (input.type) {
     case "begin":
       return null;
     case "text":
-      return `<player>${input.text.trim().slice(0, 2000)}</player>`;
+      return `<player>${sanitizePlayerText(input.text, 2000)}</player>`;
     case "choice":
-      return `<player>${input.text.trim().slice(0, 200)}</player>`;
+      return `<player>${sanitizePlayerText(input.text, 200)}</player>`;
     case "roll": {
+      if (pending) {
+        const r = roll(pending.notation, pending.advantage ?? "none", deps.rng);
+        const outcome = checkOutcome(r, pending.dc);
+        deps.emit({ type: "dice", by: "player", label: pending.label, roll: r, ...(pending.dc !== undefined ? { dc: pending.dc } : {}), ...(outcome ? { outcome } : {}) });
+        return `[Dice] ${describeRoll(r, pending.label, pending.dc)}`;
+      }
+      const label = "Free roll";
       const r = roll(input.notation, input.advantage ?? "none", deps.rng);
-      const outcome = checkOutcome(r, input.dc);
-      deps.emit({ type: "dice", by: "player", label: input.label, roll: r, ...(input.dc !== undefined ? { dc: input.dc } : {}), ...(outcome ? { outcome } : {}) });
-      return `[Dice] ${describeRoll(r, input.label.slice(0, 80), input.dc)}`;
+      deps.emit({ type: "dice", by: "player", label, roll: r });
+      return `[Dice] ${describeRoll(r, label)} (the player rolled on their own; this is not a check you asked for)`;
     }
   }
 }
@@ -305,13 +328,16 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
       messages,
       usage,
       ...(session.lastPromptTokens !== undefined ? { lastPromptTokens: session.lastPromptTokens } : {}),
+      pendingCheck: session.pendingCheck ?? null,
       lastActiveAt: new Date().toISOString(),
     });
 
   // The player's input is saved before the model is called.
   const content: BetaContentBlockParam[] = [];
   if (opening) content.push({ type: "text", text: opening });
-  const playerText = playerContent(input, deps);
+  const playerText = playerContent(input, session.pendingCheck, deps);
+  // A roll answers the pending check; typing or choosing something else moves on from it.
+  if (input.type !== "begin") session.pendingCheck = null;
   if (playerText) content.push({ type: "text", text: playerText });
   messages.push({ role: "user", content });
   await persist();
@@ -428,6 +454,11 @@ export async function runTurn(ownerId: string, campaignId: string, input: TurnIn
           pending.push(...out.events);
         }
         ui.push(...out.ui);
+        for (const e of out.ui) {
+          if (e.type === "check") {
+            session.pendingCheck = { label: e.label, notation: e.notation, ...(e.dc !== undefined ? { dc: e.dc } : {}), ...(e.advantage ? { advantage: e.advantage } : {}) };
+          }
+        }
         yieldToPlayer ||= !!out.yieldToPlayer;
         results.push({ type: "tool_result", tool_use_id: call.id, content: out.result, ...(out.isError ? { is_error: true } : {}) });
       }

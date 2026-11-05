@@ -31,7 +31,7 @@ export interface StoryState {
   busy: boolean;
   speaker?: string;
   choices: string[];
-  check?: { label: string; notation: string; dc?: number };
+  check?: { label: string; notation: string; dc?: number; advantage?: "advantage" | "disadvantage" };
   dice: DiceView[];
   scene?: { asset: Asset; status: "pending" | "unavailable" | "ready" };
   handout?: Asset;
@@ -111,7 +111,7 @@ export function reduceEvent(s: StoryState, e: TableEvent): StoryState {
     case "choices":
       return { ...s, choices: e.choices };
     case "check":
-      return { ...s, check: { label: e.label, notation: e.notation, ...(e.dc !== undefined ? { dc: e.dc } : {}) } };
+      return { ...s, check: { label: e.label, notation: e.notation, ...(e.dc !== undefined ? { dc: e.dc } : {}), ...(e.advantage ? { advantage: e.advantage } : {}) } };
     case "dice":
       return { ...s, dice: [diceView(e), ...s.dice].slice(0, 8) };
     case "image":

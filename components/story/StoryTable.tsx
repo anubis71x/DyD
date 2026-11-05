@@ -271,7 +271,8 @@ function DicePanel({ state, send }: { state: StoryState; send: (i: TurnInput) =>
   const check = state.check;
   const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
 
-  const rollCheck = () => check && send({ type: "roll", notation: check.notation, label: check.label, ...(check.dc ? { dc: check.dc } : {}), advantage: adv });
+  // The server uses its own record of the check (dice, DC, advantage); these fields are informational.
+  const rollCheck = () => check && send({ type: "roll", notation: check.notation, label: check.label });
   const rollFree = () => send({ type: "roll", notation: `d${die}${mod ? sign(mod) : ""}`, label: `Free roll d${die}`, advantage: die === 20 ? adv : "none" });
 
   return (
@@ -289,7 +290,7 @@ function DicePanel({ state, send }: { state: StoryState; send: (i: TurnInput) =>
             <span className="font-mono">{check.notation}{check.dc ? ` · DC ${check.dc}` : ""}</span>
           </div>
           <button type="button" disabled={state.busy} onClick={rollCheck} className="rounded-full bg-[color:var(--accent)] py-2 font-semibold text-[#14100b] hover:brightness-110 disabled:opacity-50">
-            Roll {check.notation}{adv !== "none" ? ` with ${adv}` : ""}
+            Roll {check.notation}{check.advantage ? ` with ${check.advantage}` : ""}
           </button>
         </div>
       )}
@@ -342,7 +343,13 @@ function DicePanel({ state, send }: { state: StoryState; send: (i: TurnInput) =>
           ))}
         </div>
       </div>
-      <button type="button" disabled={state.busy} onClick={rollFree} className="rounded-full border border-white/15 py-2 text-sm hover:border-white/30 disabled:opacity-50">
+      <button
+        type="button"
+        disabled={state.busy || !!check}
+        title={check ? "Roll the check the storyteller asked for first" : undefined}
+        onClick={rollFree}
+        className="rounded-full border border-white/15 py-2 text-sm hover:border-white/30 disabled:opacity-50"
+      >
         Roll d{die}{mod ? ` ${sign(mod)}` : ""} and tell the storyteller
       </button>
 

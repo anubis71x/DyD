@@ -4,7 +4,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { applyEvents, slugify } from "@/lib/save/reducer";
 import type { SaveEvent, SaveFile } from "@/lib/save/schema";
 import { castVoice } from "./casting";
-import { checkOutcome, describeRoll, DiceError, roll } from "./dice";
+import { checkOutcome, describeRoll, DiceError, parseNotation, roll } from "./dice";
 import type { TableEvent } from "./events";
 import { getStoryteller } from "./storytellers";
 
@@ -317,14 +317,35 @@ const TOOLS = [
         label: str("What the roll is for, e.g. 'Sleight of Hand check'"),
         notation: str("Dice notation including the character's modifier, e.g. d20+5"),
         dc: { type: "integer", minimum: 1, maximum: 40 },
+        advantage: { type: "string", enum: ["none", "advantage", "disadvantage"], description: "Only when the rules grant it" },
       },
       required: ["label", "notation"],
     },
-    schema: z.object({ label: sname, notation: z.string().max(20), dc: z.number().int().min(1).max(40).optional() }),
+    schema: z.object({
+      label: sname,
+      notation: z.string().max(20),
+      dc: z.number().int().min(1).max(40).optional(),
+      advantage: z.enum(["none", "advantage", "disadvantage"]).optional(),
+    }),
     run(i) {
+      try {
+        parseNotation(i.notation);
+      } catch (e) {
+        if (e instanceof DiceError) return ok([], e.message);
+        throw e;
+      }
+      // The engine stores this check; the player's roll uses these values, not the browser's.
       return {
         events: [],
-        ui: [{ type: "check", label: i.label, notation: i.notation, ...(i.dc !== undefined ? { dc: i.dc } : {}) }],
+        ui: [
+          {
+            type: "check",
+            label: i.label,
+            notation: i.notation,
+            ...(i.dc !== undefined ? { dc: i.dc } : {}),
+            ...(i.advantage && i.advantage !== "none" ? { advantage: i.advantage } : {}),
+          },
+        ],
         result: "The player has been asked to roll. End your reply now and wait for the result.",
         yieldToPlayer: true,
       };

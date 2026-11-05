@@ -47,6 +47,8 @@ export interface PlaySession {
   carry?: SessionCarry;
   /** Real prompt size of the last model call, from the API's usage report. */
   lastPromptTokens?: number;
+  /** A check the storyteller asked the player to roll (request_roll), awaiting the roll. */
+  pendingCheck?: PendingCheck | null;
   startedAt: string;
   lastActiveAt: string;
   endedAt?: string;
@@ -54,6 +56,13 @@ export interface PlaySession {
   recappedAt?: string;
   /** API usage per model for this session, to price coins from real numbers. */
   usage?: Record<string, SessionUsage>;
+}
+
+export interface PendingCheck {
+  label: string;
+  notation: string;
+  dc?: number;
+  advantage?: "advantage" | "disadvantage";
 }
 
 export interface SessionCarry {
@@ -105,7 +114,7 @@ export interface Stores {
     create(session: PlaySession): Promise<void>;
     /** Open sessions (any owner) with no activity since `before`, oldest first. For the idle-session job. */
     listIdle(before: string, limit: number): Promise<PlaySession[]>;
-    update(ownerId: string, sessionId: string, patch: Partial<Pick<PlaySession, "messages" | "lastActiveAt" | "endedAt" | "recappedAt" | "usage" | "partNo" | "earlierLines" | "carry" | "lastPromptTokens">>): Promise<void>;
+    update(ownerId: string, sessionId: string, patch: Partial<Pick<PlaySession, "messages" | "lastActiveAt" | "endedAt" | "recappedAt" | "usage" | "partNo" | "earlierLines" | "carry" | "lastPromptTokens" | "pendingCheck">>): Promise<void>;
   };
   wallet: {
     /** Current balance in micro-dollars (0 if the user has no wallet yet). */

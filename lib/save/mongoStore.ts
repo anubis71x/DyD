@@ -45,6 +45,7 @@ const playSessionSchema = new mongoose.Schema(
     earlierLines: { type: [mongoose.Schema.Types.Mixed], default: undefined },
     carry: { type: mongoose.Schema.Types.Mixed },
     lastPromptTokens: { type: Number },
+    pendingCheck: { type: mongoose.Schema.Types.Mixed },
     usage: { type: mongoose.Schema.Types.Mixed },
   },
   { versionKey: false, minimize: false },
@@ -101,6 +102,7 @@ const toSession = (d: Record<string, any>): PlaySession => ({
   ...(d.earlierLines ? { earlierLines: d.earlierLines } : {}),
   ...(d.carry ? { carry: d.carry } : {}),
   ...(d.lastPromptTokens !== undefined && d.lastPromptTokens !== null ? { lastPromptTokens: d.lastPromptTokens } : {}),
+  ...(d.pendingCheck ? { pendingCheck: d.pendingCheck } : {}),
   ...(d.usage ? { usage: d.usage } : {}),
 });
 
@@ -184,7 +186,7 @@ const mongoStores: Stores = {
       if (patch.endedAt) $set.endedAt = new Date(patch.endedAt);
       if (patch.usage) $set.usage = patch.usage;
       if (patch.recappedAt) $set.recappedAt = new Date(patch.recappedAt);
-      for (const k of ["partNo", "earlierLines", "carry", "lastPromptTokens"] as const) if (patch[k] !== undefined) $set[k] = patch[k];
+      for (const k of ["partNo", "earlierLines", "carry", "lastPromptTokens", "pendingCheck"] as const) if (patch[k] !== undefined) $set[k] = patch[k];
       await PlaySessionModel.updateOne({ _id: sessionId, ownerId }, { $set });
     },
   },

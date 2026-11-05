@@ -132,6 +132,7 @@ The old per-session routes (`/api/characters`, `/api/quest`, `/api/npcsRelations
 ## 🧠 Notes
 - All API endpoints require a Clerk session (`middleware.ts`), except the Stripe webhook (Stripe-signed) and the cron job (`CRON_SECRET`).
 - Balances change only on the server, through the ledger. The browser can't set them.
+- Dice are rolled on the server. When the storyteller asks for a check, the server keeps its dice, DC and advantage and uses them for the player's roll; player text is cleaned of anything that looks like a dice result or prompt marker.
 
 ---
 

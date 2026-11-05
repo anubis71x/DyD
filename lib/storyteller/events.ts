@@ -11,7 +11,7 @@ export type TableEvent =
   | { type: "speech.end" }
   | { type: "state"; save: SaveFile }
   | { type: "choices"; choices: string[] }
-  | { type: "check"; label: string; notation: string; dc?: number }
+  | { type: "check"; label: string; notation: string; dc?: number; advantage?: "advantage" | "disadvantage" }
   | { type: "dice"; by: "player" | "storyteller"; label: string; roll: DiceRoll; dc?: number; outcome?: "success" | "failure" }
   | { type: "image"; asset: Asset; status: "pending" | "unavailable" | "ready" }
   | { type: "handout"; asset: Asset }
@@ -27,6 +27,11 @@ export type TurnInput =
   | { type: "begin" }
   | { type: "text"; text: string }
   | { type: "choice"; text: string }
+  /**
+   * A dice roll. When the storyteller has asked for a check, the server uses
+   * its own record of that check (label, dice, DC, advantage) and ignores
+   * these fields; otherwise it's a free roll with this notation.
+   */
   | { type: "roll"; notation: string; label: string; dc?: number; advantage?: "none" | "advantage" | "disadvantage" };
 
 /** One line of the visible transcript, rebuilt from stored messages. */
